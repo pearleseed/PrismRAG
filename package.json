@@ -1,0 +1,19 @@
+{
+  "name": "prismrag",
+  "private": true,
+  "type": "module",
+  "workspaces": ["frontend", "mcp-server"],
+  "scripts": {
+    "lint": "oxlint --react-plugin --import-plugin --node-plugin --promise-plugin -c .oxlintrc.json --deny-warnings frontend/src frontend/vite.config.ts frontend/vitest.config.ts mcp-server/src",
+    "lint:fix": "oxlint --react-plugin --import-plugin --node-plugin --promise-plugin -c .oxlintrc.json --fix --deny-warnings frontend/src frontend/vite.config.ts frontend/vitest.config.ts mcp-server/src",
+    "format": "oxfmt -c .oxfmtrc.json frontend/src mcp-server/src frontend/vite.config.ts frontend/vitest.config.ts",
+    "format:check": "oxfmt -c .oxfmtrc.json --check frontend/src mcp-server/src frontend/vite.config.ts frontend/vitest.config.ts",
+    "typecheck": "bun run --filter prismrag-frontend typecheck && bun run --filter mcp-server typecheck",
+    "build": "bun run --filter prismrag-frontend build && bun run --filter mcp-server build",
+    "test": "bun run --filter prismrag-frontend test"
+  },
+  "devDependencies": {
+    "oxfmt": "^0.49.0",
+    "oxlint": "^1.64.0"
+  }
+}

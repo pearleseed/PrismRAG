@@ -1,0 +1,60 @@
+# ─── Python ───────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ─── Environment & Secrets ────────────────────────────────
+.env
+frontend/.env
+
+# ─── Node / Bun ───────────────────────────────────────────
+node_modules/
+
+# ─── Build outputs ────────────────────────────────────────
+dist/
+mcp-server/dist/
+frontend/dist/
+
+# ─── Backend runtime data ─────────────────────────────────
+backend/data/docling/
+backend/data/lightrag/
+backend/uploads/
+
+# ─── Eval results (large generated JSON — not source code) ─
+backend/scripts/*.json
+
+# ─── Virtual environments ─────────────────────────────────
+venv/
+.venv/
+apps/open-webui/.venv/
+apps/open-webui/data/
+
+# ─── Databases ────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+prismrag.db
+
+# ─── Logs ─────────────────────────────────────────────────
+*.log
+*.pid
+screenlog/
+screenlog.*
+
+# ─── OS / Editor artifacts ────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+.idea/
+
+# ─── Misc internal files ──────────────────────────────────
+showcase/demo_prism_video.mkv
+CLAUDE.md
+.gstack/

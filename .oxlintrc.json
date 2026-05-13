@@ -1,0 +1,39 @@
+{
+  "ignorePatterns": ["**/dist/**", "**/node_modules/**", "**/*.min.js"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn",
+    "perf": "warn",
+    "style": "off",
+    "pedantic": "off",
+    "restriction": "off",
+    "nursery": "off"
+  },
+  "rules": {
+    "react/react-in-jsx-scope": "off",
+    "no-unused-vars": "warn",
+    "eqeqeq": ["warn", "smart"],
+    "typescript/no-explicit-any": "warn",
+    "typescript/no-non-null-assertion": "off",
+    "unicorn/prefer-node-protocol": "warn",
+    "import/no-duplicates": "warn",
+    "import/no-unassigned-import": "off",
+    "import/no-named-as-default-member": "off",
+    "react/jsx-key": "error",
+    "react/no-danger": "warn",
+    "react/no-array-index-key": "off",
+    "react-hooks/exhaustive-deps": "warn",
+    "react-hooks/rules-of-hooks": "error",
+    "promise/no-return-wrap": "warn",
+    "promise/param-names": "warn",
+    "promise/no-nesting": "warn",
+    "promise/always-return": "off",
+    "eslint/no-await-in-loop": "off",
+    "eslint/no-underscore-dangle": "off",
+    "unicorn/no-array-sort": "off",
+    "unicorn/consistent-function-scoping": "off",
+    "unicorn/prefer-add-event-listener": "off",
+    "oxc/no-map-spread": "off",
+    "oxc/no-async-endpoint-handlers": "off"
+  }
+}
