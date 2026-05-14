@@ -25,7 +25,11 @@ from app.core.deps import get_db
 from app.core.exceptions import NotFoundError
 from app.models.knowledge_base import KnowledgeBase
 from app.models.document import Document, DocumentImage, DocumentStatus
-from app.schemas.document import DocumentResponse, DocumentUploadResponse
+from app.schemas.document import (
+    DocumentResponse,
+    DocumentUploadResponse,
+    BulkUploadResponse,
+)
 from app.schemas.rag import DocumentImageResponse
 
 logger = logging.getLogger(__name__)
@@ -61,7 +65,42 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 UPLOAD_DIR = settings.BASE_DIR / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-ALLOWED_EXTENSIONS = {".pdf", ".txt", ".md", ".docx", ".pptx"}
+ALLOWED_EXTENSIONS = {
+    ".pdf",
+    ".txt",
+    ".md",
+    ".docx",
+    ".pptx",
+    ".html",
+    ".htm",
+    ".xlsx",
+    ".epub",
+    ".csv",
+    ".xml",
+    ".nxml",
+    ".tex",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".tiff",
+    ".bmp",
+    ".wav",
+    ".mp3",
+    ".m4a",
+    ".aac",
+    ".ogg",
+    ".flac",
+    ".mp4",
+    ".avi",
+    ".mov",
+    ".webm",
+    ".mkv",
+    ".adoc",
+    ".asciidoc",
+    ".xbrl",
+    ".json",
+    ".vtt",
+}
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 
 
@@ -144,14 +183,15 @@ async def process_document_background(
                 )
 
 
-@router.post("/upload/{workspace_id}", response_model=DocumentUploadResponse)
-async def upload_document(
+@router.post("/upload/{workspace_id}", response_model=BulkUploadResponse)
+async def upload_documents(
     workspace_id: int,
-    file: UploadFile = File(...),
+    files: list[UploadFile] = File(...),
     custom_metadata: str | None = Form(None),
+    relative_paths: str | None = Form(None),
     db: AsyncSession = Depends(get_db),
 ):
-    """Upload a document to a knowledge base. Processing must be triggered separately."""
+    """Upload one or more documents to a knowledge base. Supports folder structure via relative_paths."""
 
     parsed_metadata = None
     if custom_metadata:
@@ -177,6 +217,17 @@ async def upload_document(
                 detail=f"Invalid custom_metadata format: {e}",
             )
 
+    paths_list = None
+    if relative_paths:
+        try:
+            paths_list = json.loads(relative_paths)
+            if not isinstance(paths_list, list) or len(paths_list) != len(files):
+                raise ValueError(
+                    "relative_paths must be a list of strings matching the number of files"
+                )
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.warning(f"Invalid relative_paths format: {e}. Ignoring paths.")
+
     result = await db.execute(
         select(KnowledgeBase).where(KnowledgeBase.id == workspace_id)
     )
@@ -185,46 +236,65 @@ async def upload_document(
     if kb is None:
         raise NotFoundError("KnowledgeBase", workspace_id)
 
-    ext = Path(file.filename or "").suffix.lower()
-    if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File type {ext} not allowed. Allowed: {ALLOWED_EXTENSIONS}",
-        )
-
-    content = await file.read()
-    if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File too large. Max size: {MAX_FILE_SIZE // 1024 // 1024}MB",
-        )
-
-    filename = f"{uuid.uuid4()}{ext}"
-    file_path = UPLOAD_DIR / filename
-
+    uploaded_docs = []
     import aiofiles
 
-    async with aiofiles.open(file_path, "wb") as f:
-        await f.write(content)
+    for i, file in enumerate(files):
+        ext = Path(file.filename or "").suffix.lower()
+        if ext not in ALLOWED_EXTENSIONS:
+            logger.warning(f"Skipping file {file.filename}: type {ext} not allowed")
+            continue
 
-    document = Document(
-        workspace_id=workspace_id,
-        filename=filename,
-        original_filename=file.filename,
-        file_type=ext[1:],
-        file_size=len(content),
-        status=DocumentStatus.PENDING,
-        custom_metadata=parsed_metadata,
-    )
-    db.add(document)
+        content = await file.read()
+        if len(content) > MAX_FILE_SIZE:
+            logger.warning(
+                f"Skipping file {file.filename}: too large ({len(content)} bytes)"
+            )
+            continue
+
+        filename = f"{uuid.uuid4()}{ext}"
+        file_path = UPLOAD_DIR / filename
+
+        async with aiofiles.open(file_path, "wb") as f:
+            await f.write(content)
+
+        rel_path = paths_list[i] if paths_list and i < len(paths_list) else None
+        if rel_path == "":
+            rel_path = None
+
+        document = Document(
+            workspace_id=workspace_id,
+            filename=filename,
+            original_filename=file.filename,
+            file_type=ext[1:],
+            file_size=len(content),
+            status=DocumentStatus.PENDING,
+            custom_metadata=parsed_metadata,
+            relative_path=rel_path,
+        )
+        db.add(document)
+        uploaded_docs.append(document)
+
+    if not uploaded_docs:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No valid files were uploaded. Check file types and sizes.",
+        )
+
     await db.commit()
-    await db.refresh(document)
+    for doc in uploaded_docs:
+        await db.refresh(doc)
 
-    return DocumentUploadResponse(
-        id=document.id,
-        filename=document.original_filename,
-        status=document.status,
-        message="Document uploaded. Click 'Process' to extract and index content.",
+    return BulkUploadResponse(
+        documents=[
+            DocumentUploadResponse(
+                id=d.id,
+                filename=d.original_filename,
+                status=d.status,
+            )
+            for d in uploaded_docs
+        ],
+        message=f"Successfully uploaded {len(uploaded_docs)} document(s).",
     )
 
 

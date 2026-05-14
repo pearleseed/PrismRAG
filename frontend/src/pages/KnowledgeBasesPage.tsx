@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import { useWorkspaces, useCreateWorkspace, useDeleteWorkspace } from "@/hooks/useWorkspaces";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,6 +11,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { KnowledgeBase } from "@/types";
 
 export function KnowledgeBasesPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { data: workspaces, isLoading } = useWorkspaces();
   const createWorkspace = useCreateWorkspace();
@@ -28,10 +30,10 @@ export function KnowledgeBasesPage() {
   }, [openMenu]);
 
   const handleCreateWorkspace = async () => {
-    if (!newWorkspaceName.trim()) return;
+    if (!newWorkspaceName.trim() || createWorkspace.isPending) return;
     try {
       const ws = await createWorkspace.mutateAsync({ name: newWorkspaceName });
-      toast.success("Knowledge base created");
+      toast.success(t("kb.kbCreated"));
       setNewWorkspaceName("");
       setShowNewWorkspace(false);
       navigate(`/knowledge-bases/${ws.id}`);
@@ -43,9 +45,9 @@ export function KnowledgeBasesPage() {
   const handleDeleteWorkspace = async (id: number) => {
     try {
       await deleteWorkspace.mutateAsync(id);
-      toast.success("Knowledge base deleted");
+      toast.success(t("kb.kbDeleted"));
     } catch {
-      toast.error("Failed to delete knowledge base");
+      toast.error(t("kb.kbDeleteFailed"));
     }
     setDeleteConfirm(null);
   };
@@ -55,10 +57,10 @@ export function KnowledgeBasesPage() {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    if (days === 0) return "Today";
-    if (days === 1) return "Yesterday";
-    if (days < 7) return `${days} days ago`;
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    if (days === 0) return t("common.today");
+    if (days === 1) return t("common.yesterday");
+    if (days < 7) return t("common.daysAgo", { days });
+    return date.toLocaleDateString(t("common.locale"), { month: "short", day: "numeric" });
   };
 
   return (
@@ -67,16 +69,16 @@ export function KnowledgeBasesPage() {
         {/* Section header + action */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-lg font-semibold">Knowledge Bases</h2>
+            <h2 className="text-lg font-semibold">{t("kb.knowledgeBases")}</h2>
             {workspaces && workspaces.length > 0 && (
               <p className="text-sm text-muted-foreground mt-0.5">
-                {workspaces.length} knowledge base{workspaces.length !== 1 ? "s" : ""}
+                {workspaces.length} {t("kb.knowledgeBaseCount")}
               </p>
             )}
           </div>
           <Button onClick={() => setShowNewWorkspace(true)} size="sm">
             <Plus className="w-4 h-4 mr-1.5" />
-            New Knowledge Base
+            {t("kb.newKnowledgeBase")}
           </Button>
         </div>
 
@@ -86,7 +88,7 @@ export function KnowledgeBasesPage() {
             <Card className="w-full max-w-md mx-4 shadow-2xl">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">New Knowledge Base</h3>
+                  <h3 className="text-lg font-semibold">{t("kb.newKnowledgeBase")}</h3>
                   <button
                     onClick={() => setShowNewWorkspace(false)}
                     className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-muted transition-colors"
@@ -95,21 +97,26 @@ export function KnowledgeBasesPage() {
                   </button>
                 </div>
                 <Input
-                  placeholder="Knowledge base name"
+                  placeholder={t("kb.kbNamePlaceholder")}
                   value={newWorkspaceName}
                   onChange={(e) => setNewWorkspaceName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleCreateWorkspace()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleCreateWorkspace();
+                    }
+                  }}
                   autoFocus
                 />
                 <div className="flex justify-end gap-2 mt-4">
                   <Button variant="ghost" onClick={() => setShowNewWorkspace(false)}>
-                    Cancel
+                    {t("common.cancel")}
                   </Button>
                   <Button
                     onClick={handleCreateWorkspace}
                     disabled={createWorkspace.isPending || !newWorkspaceName.trim()}
                   >
-                    {createWorkspace.isPending ? "Creating..." : "Create"}
+                    {createWorkspace.isPending ? t("common.creating") : t("common.create")}
                   </Button>
                 </div>
               </CardContent>
@@ -134,14 +141,11 @@ export function KnowledgeBasesPage() {
             <div className="w-20 h-20 rounded-2xl bg-blue-500/10 flex items-center justify-center mb-6">
               <Database className="w-10 h-10 text-blue-500" />
             </div>
-            <h3 className="text-xl font-semibold mb-2">Create your first knowledge base</h3>
-            <p className="text-muted-foreground text-center max-w-sm mb-6">
-              Knowledge bases store your documents and enable AI-powered search across them. Link
-              them to any project as a data source.
-            </p>
+            <h3 className="text-xl font-semibold mb-2">{t("kb.emptyTitle")}</h3>
+            <p className="text-muted-foreground text-center max-w-sm mb-6">{t("kb.emptyDesc")}</p>
             <Button onClick={() => setShowNewWorkspace(true)} size="lg">
               <Plus className="w-4 h-4 mr-2" />
-              New Knowledge Base
+              {t("kb.newKnowledgeBase")}
             </Button>
           </div>
         ) : (
@@ -188,7 +192,7 @@ export function KnowledgeBasesPage() {
                             className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-destructive hover:bg-muted transition-colors"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
-                            Delete
+                            {t("common.delete")}
                           </button>
                         </div>
                       )}
@@ -197,10 +201,10 @@ export function KnowledgeBasesPage() {
                   <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <FileText className="w-3 h-3" />
-                      {ws.document_count} docs
+                      {ws.document_count} {t("workspace.documents").toLowerCase()}
                     </span>
                     <span className="flex items-center gap-1 text-green-500">
-                      {ws.indexed_count} indexed
+                      {ws.indexed_count} {t("workspace.status.indexed").toLowerCase()}
                     </span>
                     {ws.updated_at && (
                       <>
@@ -221,9 +225,9 @@ export function KnowledgeBasesPage() {
         open={deleteConfirm !== null}
         onConfirm={() => deleteConfirm !== null && handleDeleteWorkspace(deleteConfirm)}
         onCancel={() => setDeleteConfirm(null)}
-        title="Delete Knowledge Base"
-        message="Are you sure? All documents, indexed data, and knowledge graph data will be permanently removed."
-        confirmLabel="Delete"
+        title={t("kb.deleteKB")}
+        message={t("kb.deleteKBConfirm")}
+        confirmLabel={t("common.delete")}
         variant="danger"
       />
     </div>

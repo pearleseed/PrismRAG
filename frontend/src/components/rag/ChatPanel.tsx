@@ -15,6 +15,7 @@ import {
   type ReactNode,
 } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import type { ExtraProps } from "react-markdown";
@@ -29,7 +30,6 @@ import {
   User,
   Loader2,
   Trash2,
-  Sparkles,
   FileText,
   Save,
   ImageIcon,
@@ -37,13 +37,17 @@ import {
   ChevronDown,
   Settings,
   RotateCcw,
-  Info,
   Copy,
   ClipboardCheck,
   FileCode,
   ThumbsUp,
   ThumbsDown,
   DatabaseZap,
+  ShieldCheck,
+  Languages,
+  Hash,
+  Layout,
+  Ban,
 } from "lucide-react";
 import { PrismLight as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
@@ -137,11 +141,14 @@ function CitationLink({
   index,
   source,
   relatedEntities,
+  isGrouped = false,
 }: {
   index: string;
   source: ChatSourceChunk;
   relatedEntities: string[];
+  isGrouped?: boolean;
 }) {
+  const { t } = useTranslation();
   const { activateCitation, activateCitationKG } = useWorkspaceStore();
   const doc = useFindDoc(source.document_id);
 
@@ -155,46 +162,43 @@ function CitationLink({
     }
   };
 
-  const handleKGClick = () => {
-    activateCitationKG(source, relatedEntities, doc);
-  };
-
   if (isKG) {
     // KG source — purple chip with Brain icon
     return (
       <button
         onClick={handleContentClick}
-        className="inline-flex items-center gap-0.5 h-[18px] px-1.5 mx-0.5 text-[10px] font-medium rounded-full bg-purple-400/15 text-purple-500 dark:text-purple-400 hover:bg-purple-400/25 transition-colors align-middle whitespace-nowrap"
-        title="View in Knowledge Graph"
+        className={cn(
+          "inline-flex items-center gap-0.5 h-[16px] px-1 mx-0.5 text-[9px] font-bold rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20 transition-all align-baseline",
+          isGrouped && "mx-0",
+        )}
+        title={t("chat.viewInKG")}
       >
-        <Brain className="w-2.5 h-2.5 shrink-0" />
         <span>KG-{index}</span>
       </button>
     );
   }
 
-  // Vector source — blue chip with FileText icon + docname-P.N
+  // Vector source — compact superscript-style citation
   const docName = doc?.original_filename
     ? shortenDocName(doc.original_filename)
     : `Source ${index}`;
-  const label = `${docName}-P.${source.page_no || "?"}`;
+  const label = `${index}`;
 
   return (
-    <span className="inline-flex gap-0.5 mx-0.5 align-middle">
+    <span className={cn("inline-flex items-baseline mx-0.5", isGrouped && "mx-0")}>
       <button
         onClick={handleContentClick}
-        className="inline-flex items-center gap-0.5 h-[18px] px-1.5 text-[10px] font-medium rounded-full bg-primary/12 text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
-        title={`View source: ${doc?.original_filename || "unknown"} (p.${source.page_no})`}
+        className={cn(
+          "inline-flex items-center justify-center min-w-[14px] h-[14px] px-1 text-[9px] font-bold rounded-sm bg-primary/10 text-primary hover:bg-primary/20 transition-all",
+          "hover:scale-110 active:scale-95",
+        )}
+        title={t("chat.viewSource", {
+          filename: doc?.original_filename || "unknown",
+          page: source.page_no,
+          label: `${docName}-P.${source.page_no || "?"}`,
+        })}
       >
-        <FileText className="w-2.5 h-2.5 shrink-0" />
-        <span>{label}</span>
-      </button>
-      <button
-        onClick={handleKGClick}
-        className="inline-flex items-center justify-center w-[18px] h-[18px] text-[10px] font-bold rounded-full bg-purple-400/15 text-purple-500 dark:text-purple-400 hover:bg-purple-400/25 transition-colors"
-        title="Highlight in Knowledge Graph"
-      >
-        <Brain className="w-2.5 h-2.5" />
+        {label}
       </button>
     </span>
   );
@@ -203,7 +207,15 @@ function CitationLink({
 // ---------------------------------------------------------------------------
 // Inline image badge — clickable [IMG-N] → icon + docname-P.N with preview
 // ---------------------------------------------------------------------------
-function InlineImageRef({ imgRefId, imageRef }: { imgRefId: string; imageRef: ChatImageRef }) {
+function InlineImageRef({
+  imgRefId,
+  imageRef,
+  isGrouped = false,
+}: {
+  imgRefId: string;
+  imageRef: ChatImageRef;
+  isGrouped?: boolean;
+}) {
   const [showPreview, setShowPreview] = useState(false);
   const { activateImageCitation } = useWorkspaceStore();
   const doc = useFindDoc(imageRef.document_id);
@@ -213,27 +225,25 @@ function InlineImageRef({ imgRefId, imageRef }: { imgRefId: string; imageRef: Ch
     activateImageCitation(imageRef, doc);
   };
 
-  const docName = doc?.original_filename
-    ? shortenDocName(doc.original_filename)
-    : `Image ${imgRefId}`;
-  const label = `${docName}-P.${imageRef.page_no || "?"}`;
-
   return (
-    <span className="inline-flex flex-col mx-0.5">
+    <span className={cn("inline-flex flex-col mx-0.5 align-baseline", isGrouped && "mx-0")}>
       <button
         onClick={handleClick}
-        className="inline-flex items-center gap-0.5 h-[18px] px-1.5 text-[10px] font-medium rounded-full bg-emerald-400/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-400/25 transition-colors align-middle whitespace-nowrap"
+        className={cn(
+          "inline-flex items-center gap-0.5 h-[16px] px-1 text-[9px] font-bold rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-all",
+          "hover:scale-110 active:scale-95",
+        )}
         title={imageRef.caption || `Image from page ${imageRef.page_no}`}
       >
         <ImageIcon className="w-2.5 h-2.5 shrink-0" />
-        <span>{label}</span>
+        <span>IMG-{imgRefId}</span>
       </button>
       {showPreview && (
         <a
           href={imageRef.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="block mt-1 rounded-md overflow-hidden border bg-white max-w-[280px] hover:border-primary/50 transition-colors"
+          className="block mt-1 rounded-md overflow-hidden border bg-white max-w-[280px] hover:border-primary/50 transition-colors shadow-lg z-20"
         >
           <img
             src={imageRef.url}
@@ -280,39 +290,59 @@ function injectCitations(
         }
         // Split on commas for grouped citations [a3x9, b2m7]
         const tokens = bracketMatch[1].split(/,\s*/);
+        const citationComponents: ReactNode[] = [];
+
         tokens.forEach((token, ti) => {
           const key = `${i}-${ti}`;
           // Image citation: IMG-xxxx
           const imgMatch = token.match(/^IMG-(.+)$/);
           if (imgMatch && imageRefs && imageRefs.length > 0) {
             const imgId = imgMatch[1];
-            // Match by ref_id first, then fallback to legacy numeric index
             const imageRef =
-              imageRefs.find((ir) => ir.ref_id === imgId) ?? imageRefs[parseInt(imgId, 10) - 1]; // legacy 1-indexed
+              imageRefs.find((ir) => ir.ref_id === imgId) ?? imageRefs[parseInt(imgId, 10) - 1];
             if (imageRef) {
-              result.push(<InlineImageRef key={key} imgRefId={imgId} imageRef={imageRef} />);
+              citationComponents.push(
+                <InlineImageRef
+                  key={key}
+                  imgRefId={imgId}
+                  imageRef={imageRef}
+                  isGrouped={tokens.length > 1}
+                />,
+              );
               return;
             }
           }
-          // Text citation: match source by index (string or numeric)
-          // First try current message's sources, then fallback to historical sources
+          // Text citation
           const source =
             sources.find((s) => String(s.index) === token) ??
             (fallbackSources ? fallbackSources.find((s) => String(s.index) === token) : undefined);
           if (source) {
-            result.push(
+            citationComponents.push(
               <CitationLink
                 key={key}
                 index={String(source.index)}
                 source={source}
                 relatedEntities={relatedEntities}
+                isGrouped={tokens.length > 1}
               />,
             );
             return;
           }
-          // Unmatched — render as-is
-          result.push(`[${token}]`);
+          citationComponents.push(`[${token}]`);
         });
+
+        if (tokens.length > 1) {
+          result.push(
+            <span
+              key={i}
+              className="inline-flex items-baseline rounded-sm bg-muted/30 px-0.5 mx-0.5"
+            >
+              {citationComponents}
+            </span>,
+          );
+        } else {
+          result.push(...citationComponents);
+        }
       });
       return result;
     }
@@ -405,6 +435,7 @@ function extractText(node: ReactNode): string {
 // Code block with syntax highlighting + copy button
 // ---------------------------------------------------------------------------
 function CodeBlock({ language, children }: { language: string; children: ReactNode }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const theme = useThemeStore((s) => s.theme);
   const isDark = theme === "dark";
@@ -430,7 +461,7 @@ function CodeBlock({ language, children }: { language: string; children: ReactNo
           "absolute top-2 left-2 p-1 rounded-md text-muted-foreground/50 hover:text-muted-foreground transition-all opacity-0 group-hover:opacity-100 z-10",
           isDark ? "bg-white/5 hover:bg-white/10" : "bg-black/5 hover:bg-black/10",
         )}
-        title="Copy code"
+        title={t("chat.copyCode")}
       >
         {copied ? (
           <ClipboardCheck className="w-3 h-3 text-emerald-500" />
@@ -449,8 +480,8 @@ function CodeBlock({ language, children }: { language: string; children: ReactNo
           padding: "10px 12px",
           ...(isDark
             ? {
-                background: "oklch(0.18 0.015 155)",
-                border: "1px solid oklch(0.30 0.025 155)",
+                background: "var(--color-card)",
+                border: "1px solid var(--color-border)",
               }
             : {
                 background: "oklch(0.96 0.008 105)",
@@ -554,6 +585,7 @@ function SourceRatingButtons({
   currentRating?: RelevanceRating;
   onRate: (sourceIndex: string, rating: RelevanceRating) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div
       className="flex items-center gap-0.5 ml-auto shrink-0"
@@ -570,7 +602,7 @@ function SourceRatingButtons({
             ? "text-emerald-500"
             : "text-muted-foreground/20 hover:text-emerald-500/60",
         )}
-        title="Relevant"
+        title={t("chat.relevant")}
       >
         <ThumbsUp className="w-2.5 h-2.5" />
       </button>
@@ -585,7 +617,7 @@ function SourceRatingButtons({
             ? "text-destructive"
             : "text-muted-foreground/20 hover:text-destructive/60",
         )}
-        title="Not relevant"
+        title={t("chat.notRelevant")}
       >
         <ThumbsDown className="w-2.5 h-2.5" />
       </button>
@@ -597,6 +629,7 @@ function SourceRatingButtons({
 // Sources panel — shows the retrieved chunks
 // ---------------------------------------------------------------------------
 function SourcesPanel({ sources, messageId }: { sources: ChatSourceChunk[]; messageId?: string }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [ratings, setRatings] = useState<Record<string, RelevanceRating>>({});
   const { activateCitation, activateCitationKG } = useWorkspaceStore();
@@ -630,12 +663,21 @@ function SourcesPanel({ sources, messageId }: { sources: ChatSourceChunk[]; mess
     <div className="mt-2 rounded-md border bg-muted/20 overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2 text-[10px] font-bold text-muted-foreground/80 hover:text-foreground transition-all hover:bg-muted/30"
       >
-        <FileText className="w-3 h-3" />
-        {vectorSources.length} source{vectorSources.length > 1 ? "s" : ""}
-        {kgSources.length > 0 && " + KG"}
-        <span className="ml-auto text-[10px]">{expanded ? "▲" : "▼"}</span>
+        <div className="flex items-center gap-1.5">
+          <FileText className="w-3.5 h-3.5" />
+          <span className="uppercase tracking-wider">
+            {vectorSources.length} {t("chat.sources")}
+            {kgSources.length > 0 && " + KG"}
+          </span>
+        </div>
+        <ChevronDown
+          className={cn(
+            "w-3.5 h-3.5 ml-auto transition-transform duration-300",
+            expanded && "rotate-180",
+          )}
+        />
       </button>
       <AnimatePresence>
         {expanded && (
@@ -647,10 +689,18 @@ function SourcesPanel({ sources, messageId }: { sources: ChatSourceChunk[]; mess
           >
             <div className="divide-y border-t">
               {vectorSources.map((source) => (
-                <button
+                <div
                   key={source.chunk_id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => activateCitation(source, [])}
-                  className="w-full text-left px-2.5 py-2 hover:bg-muted/50 transition-colors"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      activateCitation(source, []);
+                    }
+                  }}
+                  className="w-full text-left px-2.5 py-2 hover:bg-muted/50 transition-colors cursor-pointer"
                 >
                   <div className="flex items-center gap-1.5 mb-0.5">
                     <span className="inline-flex items-center justify-center w-4 h-4 text-[9px] font-bold rounded-full bg-primary/15 text-primary">
@@ -684,13 +734,21 @@ function SourcesPanel({ sources, messageId }: { sources: ChatSourceChunk[]; mess
                       </span>
                     </div>
                   )}
-                </button>
+                </div>
               ))}
               {kgSources.map((source) => (
-                <button
+                <div
                   key={source.chunk_id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => activateCitationKG(source, [])}
-                  className="w-full text-left px-2.5 py-2 hover:bg-purple-400/5 transition-colors"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      activateCitationKG(source, []);
+                    }
+                  }}
+                  className="w-full text-left px-2.5 py-2 hover:bg-purple-400/5 transition-colors cursor-pointer"
                 >
                   <div className="flex items-center gap-1.5 mb-0.5">
                     <span className="inline-flex items-center justify-center w-4 h-4 text-[9px] font-bold rounded-full bg-purple-400/15 text-purple-400">
@@ -719,7 +777,7 @@ function SourcesPanel({ sources, messageId }: { sources: ChatSourceChunk[]; mess
                       </span>
                     </div>
                   )}
-                </button>
+                </div>
               ))}
             </div>
           </motion.div>
@@ -756,6 +814,7 @@ function ImageRefCard({ img }: { img: ChatImageRef }) {
 }
 
 function ImageRefsPanel({ images }: { images: ChatImageRef[] }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(true);
 
   if (images.length === 0) return null;
@@ -767,7 +826,7 @@ function ImageRefsPanel({ images }: { images: ChatImageRef[] }) {
         className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors"
       >
         <ImageIcon className="w-3 h-3" />
-        {images.length} image{images.length > 1 ? "s" : ""} from documents
+        {t("chat.imagesFromDocs", { count: images.length })}
         <span className="ml-auto text-[10px]">{expanded ? "▲" : "▼"}</span>
       </button>
       <AnimatePresence>
@@ -800,20 +859,24 @@ function ImageRefsPanel({ images }: { images: ChatImageRef[] }) {
 // Thinking panel — collapsible violet-themed thinking process display
 // ---------------------------------------------------------------------------
 function ThinkingPanel({ thinking }: { thinking: string }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
   if (!thinking) return null;
 
   return (
-    <div className="mt-1.5 mb-1 rounded-md border border-violet-500/20 bg-violet-500/5 overflow-hidden">
+    <div className="mt-2 mb-1.5 rounded-xl border border-violet-500/20 bg-violet-500/5 shadow-sm overflow-hidden transition-all">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium text-violet-400 hover:text-violet-300 in-data-[theme='light']:text-violet-600 in-data-[theme='light']:hover:text-violet-700 transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2 text-[10px] font-bold text-violet-400 hover:text-violet-300 in-data-[theme='light']:text-violet-600 in-data-[theme='light']:hover:text-violet-700 transition-all hover:bg-violet-500/5"
       >
-        <Brain className="w-3 h-3" />
-        Thinking process
+        <Brain className="w-3.5 h-3.5" />
+        <span className="uppercase tracking-wider">{t("chat.thinkingProcess")}</span>
         <ChevronDown
-          className={cn("w-3 h-3 ml-auto transition-transform", expanded && "rotate-180")}
+          className={cn(
+            "w-3.5 h-3.5 ml-auto transition-transform duration-300",
+            expanded && "rotate-180",
+          )}
         />
       </button>
       <AnimatePresence>
@@ -870,6 +933,7 @@ function markdownToPlainText(md: string): string {
 }
 
 function CopyMessageActions({ content }: { content: string }) {
+  const { t } = useTranslation();
   const [copiedMode, setCopiedMode] = useState<"text" | "markdown" | null>(null);
 
   const handleCopy = useCallback(
@@ -888,26 +952,26 @@ function CopyMessageActions({ content }: { content: string }) {
       <button
         onClick={() => handleCopy("text")}
         className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/60 transition-all text-[10px]"
-        title="Copy as plain text"
+        title={t("chat.copyPlainText")}
       >
         {copiedMode === "text" ? (
           <ClipboardCheck className="w-3 h-3 text-emerald-500" />
         ) : (
           <Copy className="w-3 h-3" />
         )}
-        <span>{copiedMode === "text" ? "Copied!" : "Copy text"}</span>
+        <span>{copiedMode === "text" ? t("common.copied") : t("chat.copyPlainText")}</span>
       </button>
       <button
         onClick={() => handleCopy("markdown")}
         className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/60 transition-all text-[10px]"
-        title="Copy as markdown"
+        title={t("chat.copyMarkdown")}
       >
         {copiedMode === "markdown" ? (
           <ClipboardCheck className="w-3 h-3 text-emerald-500" />
         ) : (
           <FileCode className="w-3 h-3" />
         )}
-        <span>{copiedMode === "markdown" ? "Copied!" : "Copy markdown"}</span>
+        <span>{copiedMode === "markdown" ? t("common.copied") : t("chat.copyMarkdown")}</span>
       </button>
     </div>
   );
@@ -921,33 +985,35 @@ const MessageBubble = memo(function MessageBubble({ message }: { message: ChatMe
 
   const proseClasses = cn(
     "prose prose-sm max-w-none text-foreground/90",
-    "[&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5",
+    "[&_p]:my-1.5 [&_ul]:my-1.5 [&_ol]:my-1.5 [&_li]:my-1",
     "[&_pre]:bg-transparent [&_pre]:border-none [&_pre]:p-0 [&_pre]:m-0",
-    "[&_code]:bg-muted/50 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:text-foreground/90",
-    "[&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2",
-    "[&_strong]:text-foreground [&_em]:text-foreground/80",
+    "[&_code]:bg-muted/60 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-[0.85em] [&_code]:text-foreground/90 [&_code]:font-mono",
+    "[&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_a]:decoration-primary/30 hover:[&_a]:decoration-primary transition-all",
+    "[&_strong]:text-foreground [&_strong]:font-bold",
+    "[&_em]:text-foreground/80 [&_em]:italic",
     "[&_h1]:text-foreground [&_h2]:text-foreground [&_h3]:text-foreground [&_h4]:text-foreground",
-    "[&_h1]:text-base [&_h1]:font-bold [&_h1]:mt-3 [&_h1]:mb-1",
-    "[&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-2.5 [&_h2]:mb-1",
-    "[&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-0.5",
-    "[&_blockquote]:border-l-2 [&_blockquote]:border-primary/30 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-foreground/60",
-    "[&_table]:text-xs [&_th]:px-2 [&_th]:py-1 [&_td]:px-2 [&_td]:py-1 [&_th]:text-foreground/80 [&_td]:text-foreground/80",
+    "[&_h1]:text-lg [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2",
+    "[&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-3 [&_h2]:mb-1.5",
+    "[&_h3]:text-sm [&_h3]:font-bold [&_h3]:mt-2.5 [&_h3]:mb-1",
+    "[&_blockquote]:border-l-4 [&_blockquote]:border-primary/20 [&_blockquote]:pl-4 [&_blockquote]:py-1 [&_blockquote]:italic [&_blockquote]:text-foreground/70 [&_blockquote]:bg-primary/5 [&_blockquote]:rounded-r-lg",
+    "[&_table]:text-[13px] [&_table]:my-4 [&_th]:px-3 [&_th]:py-2 [&_td]:px-3 [&_td]:py-2 [&_th]:text-foreground/90 [&_td]:text-foreground/80 [&_th]:bg-muted/50 [&_table]:border-collapse [&_table]:w-full",
     "[&_li]:text-foreground/90",
-    "[&_.katex-display]:overflow-x-auto [&_.katex-display]:py-2",
-    "[&_.katex]:text-[0.9em]",
+    "[&_.katex-display]:overflow-x-auto [&_.katex-display]:py-3",
+    "[&_.katex]:text-[1em]",
   );
 
   return (
     <motion.div
+      layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className={cn("flex gap-2", isUser ? "justify-end" : "justify-start")}
+      className={cn("flex gap-2 group/message", isUser ? "justify-end" : "justify-start")}
     >
       {/* Assistant: Bot icon with glow ring during streaming */}
       {!isUser && (
         <div className="relative w-6 h-6 shrink-0 mt-1">
-          {message.isStreaming && <div className="icon-glow-ring" />}
-          <div className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center">
+          {message.isStreaming && <div className="icon-glow-ring animate-pulse" />}
+          <div className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center shadow-sm border border-primary/10">
             <Bot className="w-3.5 h-3.5 text-primary" />
           </div>
         </div>
@@ -955,7 +1021,13 @@ const MessageBubble = memo(function MessageBubble({ message }: { message: ChatMe
 
       <div
         className={cn(
-          isUser ? "max-w-[85%] rounded-xl px-3 py-2 bg-secondary/50" : "max-w-[90%] min-w-0 py-1",
+          "relative transition-all duration-300",
+          isUser
+            ? "max-w-[85%] rounded-2xl px-4 py-2 bg-secondary/50 shadow-sm"
+            : cn(
+                "max-w-[92%] min-w-0 py-1 px-1 rounded-2xl",
+                message.isStreaming && "bg-linear-to-b from-primary/5 to-transparent",
+              ),
         )}
       >
         {/* ThinkingTimeline — single instance, never unmounts between streaming→completed */}
@@ -978,11 +1050,11 @@ const MessageBubble = memo(function MessageBubble({ message }: { message: ChatMe
         ) : message.isStreaming ? (
           message.content ? (
             <div
-              className={cn(proseClasses, "relative")}
+              className={cn(proseClasses, "relative transition-opacity duration-500")}
               style={{
-                maskImage: "linear-gradient(to bottom, black calc(100% - 80px), transparent 100%)",
+                maskImage: "linear-gradient(to bottom, black calc(100% - 40px), transparent 100%)",
                 WebkitMaskImage:
-                  "linear-gradient(to bottom, black calc(100% - 80px), transparent 100%)",
+                  "linear-gradient(to bottom, black calc(100% - 40px), transparent 100%)",
               }}
             >
               <StreamingMarkdown
@@ -1059,6 +1131,7 @@ const MessageBubble = memo(function MessageBubble({ message }: { message: ChatMe
 // ---------------------------------------------------------------------------
 
 function InlineThinkingPreview({ text }: { text: string }) {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const isUserScrolledRef = useRef(false);
 
@@ -1076,23 +1149,28 @@ function InlineThinkingPreview({ text }: { text: string }) {
   }, [text]);
 
   return (
-    <div className="mt-1">
-      <div className="flex items-center gap-1.5 mb-1.5">
-        <Brain className="w-3.5 h-3.5 text-violet-400 animate-pulse" />
-        <span className="text-xs font-medium text-violet-400">Thinking...</span>
+    <div className="mt-2 p-3 rounded-xl border border-violet-500/20 bg-violet-500/5 shadow-[0_0_15px_-5px_rgba(139,92,246,0.1)] transition-all">
+      <div className="flex items-center gap-1.5 mb-2">
+        <div className="relative">
+          <div className="absolute inset-0 bg-violet-400 blur-md opacity-20 animate-pulse" />
+          <Brain className="w-3.5 h-3.5 text-violet-400 relative" />
+        </div>
+        <span className="text-xs font-bold text-violet-400/90 tracking-tight uppercase">
+          {t("chat.thinking")}
+        </span>
       </div>
       <div
         ref={containerRef}
         onScroll={handleScroll}
         className={cn(
-          "text-xs leading-relaxed text-muted-foreground/70 italic",
-          "max-h-[200px] overflow-y-auto scrollbar-none",
-          "border-l-2 border-violet-500/30 pl-3",
+          "text-xs leading-relaxed text-muted-foreground/60 font-mono",
+          "max-h-[180px] overflow-y-auto scrollbar-none",
+          "border-l border-violet-500/20 pl-3 ml-1",
           "whitespace-pre-wrap wrap-break-word",
         )}
       >
         {text}
-        <span className="animate-pulse text-violet-400 ml-0.5">|</span>
+        <span className="animate-pulse text-violet-400 font-bold ml-0.5">_</span>
       </div>
     </div>
   );
@@ -1101,14 +1179,16 @@ function InlineThinkingPreview({ text }: { text: string }) {
 // ---------------------------------------------------------------------------
 // Typing indicator
 // ---------------------------------------------------------------------------
-const STATUS_LABELS: Record<string, string> = {
-  analyzing: "Analyzing your question...",
-  retrieving: "Searching documents...",
-  generating: "Generating answer...",
-};
-
 function TypingIndicator({ status }: { status?: ChatStreamStatus }) {
-  const label = (status && STATUS_LABELS[status]) || "Analyzing documents...";
+  const { t } = useTranslation();
+  const label =
+    status === "analyzing"
+      ? t("chat.analyzingQuestion")
+      : status === "retrieving"
+        ? t("chat.searchingDocs")
+        : status === "generating"
+          ? t("chat.generatingAnswer")
+          : t("workspace.analyzing");
   return (
     <div className="flex gap-2 items-start">
       <div className="relative w-6 h-6 shrink-0">
@@ -1131,33 +1211,56 @@ function TypingIndicator({ status }: { status?: ChatStreamStatus }) {
 // Suggestion chips (empty state)
 // ---------------------------------------------------------------------------
 function SuggestionChips({ onSelect }: { onSelect: (q: string) => void }) {
+  const { t } = useTranslation();
   const suggestions = [
-    "Summarize the key findings",
-    "What are the main topics?",
-    "List important entities mentioned",
-    "Explain the methodology used",
+    t("chat.suggestions.summarize"),
+    t("chat.suggestions.topics"),
+    t("chat.suggestions.entities"),
+    t("chat.suggestions.methodology"),
   ];
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-4">
-      <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-        <Sparkles className="w-6 h-6 text-primary" />
-      </div>
-      <h3 className="text-sm font-semibold mb-1">AI Document Assistant</h3>
-      <p className="text-xs text-muted-foreground text-center mb-4 max-w-[240px]">
-        Ask questions about your documents. I'll find relevant information and cite my sources.
-      </p>
-      <div className="flex flex-wrap gap-1.5 justify-center max-w-[300px]">
-        {suggestions.map((s) => (
-          <button
-            key={s}
-            onClick={() => onSelect(s)}
-            className="text-[11px] px-2.5 py-1 rounded-full border bg-card hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-          >
-            {s}
-          </button>
-        ))}
-      </div>
+    <div className="flex-1 flex flex-col items-center justify-center px-6 relative overflow-hidden">
+      {/* Background Decorative Element */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col items-center text-center z-10"
+      >
+        <div className="relative mb-6">
+          <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full animate-pulse" />
+          <div className="w-16 h-16 rounded-2xl bg-linear-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/20 relative border border-white/20">
+            <Bot className="w-8 h-8 text-white" />
+          </div>
+        </div>
+
+        <h3 className="text-xl font-bold mb-2 tracking-tight">{t("chat.aiAssistant")}</h3>
+        <p className="text-sm text-muted-foreground mb-8 max-w-[280px] leading-relaxed">
+          {t("chat.assistantDesc")}
+        </p>
+
+        <div className="grid grid-cols-2 gap-3 max-w-[400px]">
+          {suggestions.map((s, i) => (
+            <motion.button
+              key={s}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+              onClick={() => onSelect(s)}
+              className={cn(
+                "group relative flex items-center justify-center text-xs px-4 py-3 rounded-xl border bg-card/50 backdrop-blur-sm transition-all",
+                "hover:border-primary/50 hover:bg-primary/5 hover:shadow-md hover:shadow-primary/5 hover:-translate-y-1",
+                "text-muted-foreground hover:text-foreground font-medium",
+              )}
+            >
+              <span className="relative z-10">{s}</span>
+              <div className="absolute inset-0 rounded-xl bg-linear-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            </motion.button>
+          ))}
+        </div>
+      </motion.div>
     </div>
   );
 }
@@ -1208,22 +1311,6 @@ const DEFAULT_SYSTEM_PROMPT =
   "- If the premise is incorrect based on sources, explain why.";
 
 // Hard rules always appended — shown in tooltip, not editable
-const HARD_RULES_SUMMARY = [
-  // Language (MANDATORY)
-  "MUST answer in the SAME language as user's question.",
-  // Citation
-  "Cite EVERY claim: [a3x9][b2m7]. No space before citation.",
-  "Images: [IMG-p4f2][IMG-q7r3]. Never group or mix brackets.",
-  "Max 3 citations per sentence. No References section at end.",
-  // Formatting
-  'Start with summary, NEVER with heading or "Based on...".',
-  "## for sections. Tables for comparisons. Flat lists only.",
-  "LaTeX: $inline$ and $$block$$. Never Unicode for math.",
-  "```language for code. > for quotes. **bold** for key terms.",
-  // Restrictions
-  'No hedging ("It is important..."). State answers directly.',
-  "No emojis. Never end with a question.",
-];
 
 interface ChatPanelProps {
   workspaceId: string;
@@ -1236,11 +1323,13 @@ export const ChatPanel = memo(function ChatPanel({
   hasIndexedDocs,
   workspace,
 }: ChatPanelProps) {
+  const { t } = useTranslation();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [enableThinking, setEnableThinking] = useState(false);
   const [thinkingDefaultSynced, setThinkingDefaultSynced] = useState(false);
   const [forceSearch, setForceSearch] = useState(false);
+  const [showScrollButton, setShowScrollButton] = useState(false);
 
   // Load chat history from PostgreSQL
   const { data: historyData, isLoading: historyLoading } = useChatHistory(workspaceId);
@@ -1264,14 +1353,14 @@ export const ChatPanel = memo(function ChatPanel({
         setDebugMode((prev) => {
           const next = !prev;
           localStorage.setItem("prismrag-debug-mode", String(next));
-          toast.success(next ? "Debug mode ON" : "Debug mode OFF");
+          toast.success(next ? t("chat.debugOn") : t("chat.debugOff"));
           return next;
         });
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, []);
+  }, [t]);
 
   // System prompt editor
   const updateWorkspaceMutation = useUpdateWorkspace();
@@ -1292,18 +1381,18 @@ export const ChatPanel = memo(function ChatPanel({
     const toSave = promptDraft.trim() === DEFAULT_SYSTEM_PROMPT ? "" : promptDraft;
     updateWorkspaceMutation.mutate(
       { id: workspace.id, data: { system_prompt: toSave } },
-      { onSuccess: () => toast.success("System prompt saved") },
+      { onSuccess: () => toast.success(t("chat.systemPromptSaved")) },
     );
-  }, [workspace, promptDraft, updateWorkspaceMutation]);
+  }, [workspace, promptDraft, updateWorkspaceMutation, t]);
 
   const handleResetPrompt = useCallback(() => {
     if (!workspace) return;
     setPromptDraft(DEFAULT_SYSTEM_PROMPT);
     updateWorkspaceMutation.mutate(
       { id: workspace.id, data: { system_prompt: "" } },
-      { onSuccess: () => toast.success("System prompt reset to default") },
+      { onSuccess: () => toast.success(t("chat.systemPromptReset")) },
     );
-  }, [workspace, updateWorkspaceMutation]);
+  }, [workspace, updateWorkspaceMutation, t]);
 
   // Check LLM capabilities (thinking support)
   const { data: capabilities } = useQuery<LLMCapabilities>({
@@ -1391,10 +1480,10 @@ export const ChatPanel = memo(function ChatPanel({
 
         const scrollEl = el; // capture for closure
         function animate(now: number) {
-          const t = Math.min((now - startTime) / duration, 1);
-          const ease = 1 - Math.pow(1 - t, 3); // easeOutCubic
+          const progress = Math.min((now - startTime) / duration, 1);
+          const ease = 1 - Math.pow(1 - progress, 3); // easeOutCubic
           scrollEl.scrollTop = start + distance * ease;
-          if (t < 1) {
+          if (progress < 1) {
             scrollAnimRef.current = requestAnimationFrame(animate);
           } else {
             scrollAnimRef.current = undefined;
@@ -1442,10 +1531,10 @@ export const ChatPanel = memo(function ChatPanel({
         const startTime = performance.now();
 
         function animate(now: number) {
-          const t = Math.min((now - startTime) / duration, 1);
-          const ease = 1 - Math.pow(1 - t, 3); // easeOutCubic
+          const progress = Math.min((now - startTime) / duration, 1);
+          const ease = 1 - Math.pow(1 - progress, 3); // easeOutCubic
           container!.scrollTop = start + distance * ease;
-          if (t < 1) {
+          if (progress < 1) {
             scrollAnimRef.current = requestAnimationFrame(animate);
           } else {
             scrollAnimRef.current = undefined;
@@ -1468,10 +1557,21 @@ export const ChatPanel = memo(function ChatPanel({
         spacerRef.current.style.height = `${container.clientHeight}px`;
       }
     };
+    const handleScrollEvent = () => {
+      const threshold = 150;
+      const isScrolledUp =
+        container.scrollHeight - container.clientHeight - container.scrollTop > threshold;
+      setShowScrollButton(isScrolledUp);
+    };
+
     updateSpacer();
+    container.addEventListener("scroll", handleScrollEvent);
     const observer = new ResizeObserver(updateSpacer);
     observer.observe(container);
-    return () => observer.disconnect();
+    return () => {
+      container.removeEventListener("scroll", handleScrollEvent);
+      observer.disconnect();
+    };
   }, [hasMessages]);
 
   // Reset spacer when streaming ends; track transition to avoid spurious scrollToBottom
@@ -1692,10 +1792,20 @@ export const ChatPanel = memo(function ChatPanel({
         <AllSourcesCtx.Provider value={allSources}>
           <div className="h-full flex flex-col border-r min-h-0">
             {/* Header */}
-            <div className="shrink-0 flex items-center justify-between px-3 py-2 border-b">
-              <div className="flex items-center gap-2">
-                <Bot className="w-4 h-4 text-primary" />
-                <span className="text-sm font-semibold">AI Assistant</span>
+            <div className="shrink-0 flex items-center justify-between px-4 py-2.5 border-b bg-background/80 backdrop-blur-md sticky top-0 z-20">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Bot className="w-4 h-4 text-primary" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold tracking-tight">{t("chat.aiAssistant")}</span>
+                  <div className="flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">
+                      Online
+                    </span>
+                  </div>
+                </div>
               </div>
               <div className="flex items-center gap-1.5">
                 {/* Thinking toggle — only visible when model supports thinking */}
@@ -1703,59 +1813,56 @@ export const ChatPanel = memo(function ChatPanel({
                   <button
                     onClick={() => setEnableThinking((prev) => !prev)}
                     className={cn(
-                      "flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] transition-colors",
+                      "flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold transition-all",
                       enableThinking
-                        ? "text-violet-400 bg-violet-400/10 hover:bg-violet-400/15"
-                        : "text-muted-foreground hover:bg-muted",
+                        ? "text-violet-500 bg-violet-500/10 hover:bg-violet-500/20 shadow-sm shadow-violet-500/10"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
                     )}
-                    title={enableThinking ? "Thinking mode ON" : "Thinking mode OFF"}
+                    title={enableThinking ? t("chat.thinkingOn") : t("chat.thinkingOff")}
                   >
-                    <Brain className="w-3 h-3" />
-                    <span>{enableThinking ? "Think" : "Think"}</span>
+                    <Brain className="w-3.5 h-3.5" />
+                    <span className="uppercase tracking-tight">{t("chat.think")}</span>
                   </button>
                 )}
                 {/* Force search toggle */}
                 <button
                   onClick={() => setForceSearch((prev) => !prev)}
                   className={cn(
-                    "flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] transition-colors",
+                    "flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold transition-all",
                     forceSearch
-                      ? "text-amber-500 bg-amber-500/10 hover:bg-amber-500/15"
-                      : "text-muted-foreground hover:bg-muted",
+                      ? "text-amber-500 bg-amber-500/10 hover:bg-amber-500/20 shadow-sm shadow-amber-500/10"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
-                  title={
-                    forceSearch
-                      ? "Force Search ON — pre-searches before every answer"
-                      : "Force Search OFF — AI decides when to search"
-                  }
+                  title={forceSearch ? t("chat.forceSearchOn") : t("chat.forceSearchOff")}
                 >
-                  <DatabaseZap className="w-3 h-3" />
-                  <span>Search</span>
+                  <DatabaseZap className="w-3.5 h-3.5" />
+                  <span className="uppercase tracking-tight">{t("chat.search")}</span>
                 </button>
+                <div className="h-4 w-px bg-border mx-1" />
                 {/* System prompt settings */}
                 <button
                   onClick={() => setShowPromptEditor((p) => !p)}
                   className={cn(
-                    "flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] transition-colors",
+                    "p-1.5 rounded-lg transition-all",
                     showPromptEditor
-                      ? "text-blue-500 bg-blue-500/10 hover:bg-blue-500/15"
-                      : "text-muted-foreground hover:bg-muted",
+                      ? "text-blue-500 bg-blue-500/10 hover:bg-blue-500/20"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
-                  title="System prompt settings"
+                  title={t("chat.systemPromptSettings")}
                 >
-                  <Settings className="w-3 h-3" />
+                  <Settings className="w-4 h-4" />
                 </button>
                 {messages.length > 0 && (
                   <button
                     onClick={handleClear}
-                    className="p-1 rounded hover:bg-muted transition-colors"
-                    title="Clear chat"
+                    className="p-1.5 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-all text-muted-foreground"
+                    title={t("chat.clearChat")}
                   >
-                    <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 )}
                 {debugMode && (
-                  <span className="text-[8px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-500 font-mono font-semibold">
+                  <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-500 text-white font-bold tracking-widest shadow-sm">
                     DEBUG
                   </span>
                 )}
@@ -1774,7 +1881,7 @@ export const ChatPanel = memo(function ChatPanel({
                   <div className="px-3 py-2 space-y-2 bg-muted/20">
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-medium text-muted-foreground">
-                        System Prompt
+                        {t("chat.systemPrompt")}
                       </span>
                       <span
                         className={cn(
@@ -1790,7 +1897,7 @@ export const ChatPanel = memo(function ChatPanel({
                     <textarea
                       value={promptDraft}
                       onChange={(e) => setPromptDraft(e.target.value)}
-                      placeholder="Enter your custom system prompt..."
+                      placeholder={t("chat.systemPromptPlaceholder")}
                       rows={8}
                       className={cn(
                         "w-full resize-none rounded-md border border-input bg-background px-2.5 py-2 text-xs",
@@ -1798,34 +1905,104 @@ export const ChatPanel = memo(function ChatPanel({
                         "leading-relaxed",
                       )}
                     />
-                    {/* Hard rules — icon with hover tooltip */}
                     <div className="flex items-center gap-1.5">
                       <div className="relative group/cite">
-                        <div className="flex items-center gap-1 cursor-help">
-                          <Info className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                          <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">
-                            Hard rules auto-appended
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 cursor-help transition-all hover:bg-blue-500/20 hover:border-blue-500/30 shadow-sm shadow-blue-500/5">
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                          <span className="text-[10px] font-bold uppercase tracking-tight">
+                            {t("chat.hardRules")}
                           </span>
                         </div>
+
                         {/* Tooltip on hover — below icon */}
-                        <div className="absolute left-0 top-full mt-1.5 z-50 w-[340px] rounded-lg border border-border bg-background shadow-xl opacity-0 pointer-events-none group-hover/cite:opacity-100 group-hover/cite:pointer-events-auto transition-opacity duration-150">
-                          <div className="px-3 py-2.5">
-                            <p className="text-[10px] font-semibold text-blue-700 dark:text-blue-300 mb-1.5">
-                              Citation + Formatting + Restrictions (always enforced)
-                            </p>
-                            <ul className="space-y-1">
-                              {HARD_RULES_SUMMARY.map((rule, i) => (
-                                <li
-                                  key={i}
-                                  className="text-[10px] text-foreground/70 leading-snug flex gap-1"
-                                >
-                                  <span className="text-blue-500 dark:text-blue-400 shrink-0">
-                                    •
-                                  </span>
-                                  {rule}
-                                </li>
-                              ))}
-                            </ul>
+                        <div className="absolute left-0 top-full mt-2.5 z-50 w-[380px] rounded-xl border border-blue-500/20 bg-background/95 backdrop-blur-xl shadow-2xl opacity-0 pointer-events-none group-hover/cite:opacity-100 group-hover/cite:pointer-events-auto transition-all duration-300 translate-y-1 group-hover/cite:translate-y-0">
+                          <div className="p-4 relative overflow-hidden">
+                            {/* Background accent */}
+
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="p-1.5 rounded-lg bg-blue-500/10">
+                                <FileText className="w-4 h-4 text-blue-500" />
+                              </div>
+                              <div>
+                                <h4 className="text-xs font-bold text-foreground">
+                                  AI Governance Rules
+                                </h4>
+                                <p className="text-[9px] text-muted-foreground font-medium">
+                                  Strictly enforced for all workspace responses
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-3">
+                                <div>
+                                  <h5 className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                                    <Languages className="w-3 h-3" /> Language
+                                  </h5>
+                                  <ul className="space-y-1.5">
+                                    <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
+                                      <span className="text-blue-500 shrink-0">•</span>
+                                      Same language as question
+                                    </li>
+                                  </ul>
+                                </div>
+                                <div>
+                                  <h5 className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                                    <Hash className="w-3 h-3" /> Citation
+                                  </h5>
+                                  <ul className="space-y-1.5">
+                                    <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
+                                      <span className="text-blue-500 shrink-0">•</span>
+                                      Cite EVERY claim: [id]
+                                    </li>
+                                    <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
+                                      <span className="text-blue-500 shrink-0">•</span>
+                                      Images: [IMG-id]
+                                    </li>
+                                    <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
+                                      <span className="text-blue-500 shrink-0">•</span>
+                                      Max 3 citations/sentence
+                                    </li>
+                                  </ul>
+                                </div>
+                              </div>
+                              <div className="space-y-3">
+                                <div>
+                                  <h5 className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                                    <Layout className="w-3 h-3" /> Formatting
+                                  </h5>
+                                  <ul className="space-y-1.5">
+                                    <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
+                                      <span className="text-blue-500 shrink-0">•</span>
+                                      Start with direct summary
+                                    </li>
+                                    <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
+                                      <span className="text-blue-500 shrink-0">•</span>
+                                      Use tables & flat lists
+                                    </li>
+                                    <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
+                                      <span className="text-blue-500 shrink-0">•</span>
+                                      LaTeX for math symbols
+                                    </li>
+                                  </ul>
+                                </div>
+                                <div>
+                                  <h5 className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                                    <Ban className="w-3 h-3" /> Restrictions
+                                  </h5>
+                                  <ul className="space-y-1.5">
+                                    <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
+                                      <span className="text-blue-500 shrink-0">•</span>
+                                      No hedging or emojis
+                                    </li>
+                                    <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
+                                      <span className="text-blue-500 shrink-0">•</span>
+                                      No trailing questions
+                                    </li>
+                                  </ul>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1840,10 +2017,10 @@ export const ChatPanel = memo(function ChatPanel({
                             ? "text-muted-foreground hover:bg-muted hover:text-foreground"
                             : "text-muted-foreground/30 cursor-not-allowed",
                         )}
-                        title="Reset to default prompt"
+                        title={t("chat.resetPrompt")}
                       >
                         <RotateCcw className="w-3 h-3" />
-                        Reset
+                        {t("common.reset")}
                       </button>
                       <button
                         onClick={handleSavePrompt}
@@ -1860,7 +2037,7 @@ export const ChatPanel = memo(function ChatPanel({
                         ) : (
                           <Save className="w-3 h-3" />
                         )}
-                        Save
+                        {t("common.save")}
                       </button>
                     </div>
                   </div>
@@ -1886,59 +2063,107 @@ export const ChatPanel = memo(function ChatPanel({
                 {/* ThinkingTimeline + TypingIndicator now rendered inside MessageBubble */}
                 {/* Bottom spacer = container height, enables user-message scroll-to-top */}
                 <div ref={spacerRef} aria-hidden />
+
+                {/* Scroll to Bottom Button */}
+                <AnimatePresence>
+                  {showScrollButton && (
+                    <motion.button
+                      initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.8, y: 10 }}
+                      onClick={() => scrollToBottom(true)}
+                      className="absolute bottom-4 right-6 w-8 h-8 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90 transition-colors z-30"
+                      title={t("chat.scrollToBottom")}
+                    >
+                      <ChevronDown className="w-5 h-5" />
+                    </motion.button>
+                  )}
+                </AnimatePresence>
               </div>
             )}
 
             {/* Input area */}
-            <div className="shrink-0 p-3 border-t">
-              <div className="flex items-end gap-2">
+            <div className="shrink-0 px-4 pb-4 pt-0 border-t bg-background/80 backdrop-blur-md relative group/input flex flex-col">
+              {/* Internal Resize Handle */}
+              <div
+                className="w-full h-1.5 cursor-ns-resize flex items-center justify-center hover:bg-primary/5 transition-colors group/handle py-2"
+                onMouseDown={(e) => {
+                  const startY = e.clientY;
+                  const startHeight = inputRef.current?.offsetHeight || 0;
+                  const onMouseMove = (moveEvent: MouseEvent) => {
+                    if (inputRef.current) {
+                      const delta = startY - moveEvent.clientY;
+                      const newHeight = Math.max(36, Math.min(600, startHeight + delta));
+                      inputRef.current.style.height = `${newHeight}px`;
+                    }
+                  };
+                  const onMouseUp = () => {
+                    window.removeEventListener("mousemove", onMouseMove);
+                    window.removeEventListener("mouseup", onMouseUp);
+                  };
+                  window.addEventListener("mousemove", onMouseMove);
+                  window.addEventListener("mouseup", onMouseUp);
+                }}
+              >
+                <div className="w-8 h-1 rounded-full bg-muted-foreground/10 group-hover/handle:bg-primary/30 transition-all group-hover/handle:w-12" />
+              </div>
+
+              <div className="flex items-end gap-2 relative">
                 <textarea
                   ref={inputRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Ask about your documents..."
+                  placeholder={t("chat.inputPlaceholder")}
                   rows={1}
                   className={cn(
-                    "flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm",
-                    "placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                    "max-h-[120px] min-h-[36px]",
+                    "flex-1 resize-none rounded-2xl border border-input bg-muted/30 px-4 py-2.5 text-sm",
+                    "placeholder:text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30",
+                    "max-h-[600px] min-h-[44px] overflow-y-auto transition-all",
+                    "focus:bg-background shadow-inner",
                   )}
                   style={{
                     height: "auto",
-                    minHeight: "36px",
+                    minHeight: "44px",
                   }}
                   onInput={(e) => {
                     const target = e.target as HTMLTextAreaElement;
                     target.style.height = "auto";
-                    target.style.height = Math.min(target.scrollHeight, 120) + "px";
+                    target.style.height = Math.min(target.scrollHeight, 600) + "px";
                   }}
                 />
-                {stream.isStreaming ? (
-                  <button
-                    onClick={stream.cancel}
-                    className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center transition-colors bg-destructive/15 text-destructive hover:bg-destructive/25"
-                    title="Stop generating"
-                  >
-                    <Square className="w-3.5 h-3.5 fill-current" />
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleSend()}
-                    disabled={!input.trim()}
-                    className={cn(
-                      "shrink-0 w-9 h-9 rounded-lg flex items-center justify-center transition-colors",
-                      input.trim()
-                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                        : "bg-muted text-muted-foreground cursor-not-allowed",
-                    )}
-                  >
-                    <Send className="w-4 h-4" />
-                  </button>
-                )}
+                <div className="flex flex-col gap-1">
+                  {stream.isStreaming ? (
+                    <button
+                      onClick={stream.cancel}
+                      className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all bg-destructive/10 text-destructive hover:bg-destructive/20 shadow-sm"
+                      title={t("chat.stopGenerating")}
+                    >
+                      <Square className="w-4 h-4 fill-current" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleSend()}
+                      disabled={!input.trim()}
+                      className={cn(
+                        "shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all shadow-md",
+                        input.trim()
+                          ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-primary/20 hover:-translate-y-0.5"
+                          : "bg-muted text-muted-foreground cursor-not-allowed",
+                      )}
+                    >
+                      <Send
+                        className={cn(
+                          "w-4 h-4",
+                          input.trim() && "animate-in fade-in zoom-in duration-300",
+                        )}
+                      />
+                    </button>
+                  )}
+                </div>
               </div>
               <p className="text-[9px] text-muted-foreground/50 mt-1 text-center">
-                Press Enter to send, Shift+Enter for new line
+                {t("chat.inputHint")}
               </p>
             </div>
           </div>

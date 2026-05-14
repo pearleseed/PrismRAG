@@ -22,7 +22,7 @@ class Settings(BaseSettings):
         default="postgresql+asyncpg://postgres:postgres@localhost:5433/prismrag"
     )
 
-    # LLM Provider: "gemini" | "ollama"
+    # LLM Provider: "gemini" | "ollama" | "custom"
     LLM_PROVIDER: str = Field(default="gemini")
 
     # Google AI
@@ -32,6 +32,18 @@ class Settings(BaseSettings):
     OLLAMA_HOST: str = Field(default="http://localhost:11434")
     OLLAMA_MODEL: str = Field(default="gemma3:12b")
     OLLAMA_ENABLE_THINKING: bool = Field(default=False)
+
+    # ========================================================================
+    # Custom LLM Provider Configuration
+    # ========================================================================
+    # Custom LLM provider for external AI backends
+    # Set LLM_PROVIDER=custom to enable this
+    CUSTOM_LLM_ENDPOINT: str = Field(default="")
+    CUSTOM_LLM_AUTH_TYPE: str = Field(default="bearer")
+    CUSTOM_LLM_AUTH_CREDENTIALS: str = Field(default="")
+    CUSTOM_LLM_TIMEOUT: float = Field(default=30.0)
+    CUSTOM_LLM_VERIFY_SSL: bool = Field(default=True)
+    CUSTOM_LLM_MODEL_NAME: str = Field(default="custom-llm")
 
     # LLM (fast model for chat + KG extraction — used when provider=gemini)
     LLM_MODEL_FAST: str = Field(default="gemini-2.5-flash")

@@ -21,11 +21,13 @@ node_modules/
 dist/
 mcp-server/dist/
 frontend/dist/
+audit-report
 
 # ─── Backend runtime data ─────────────────────────────────
 backend/data/docling/
 backend/data/lightrag/
 backend/uploads/
+backend/tests/
 
 # ─── Eval results (large generated JSON — not source code) ─
 backend/scripts/*.json
@@ -41,6 +43,7 @@ apps/open-webui/data/
 *.sqlite
 *.sqlite3
 prismrag.db
+chroma_db/
 
 # ─── Logs ─────────────────────────────────────────────────
 *.log

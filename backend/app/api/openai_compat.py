@@ -29,11 +29,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1", tags=["openai-compat"])
 
 
-def _parse_workspace_id(model: str) -> int | None:
+def _parse_workspace_id(model: str) -> int | str | None:
     """Resolve workspace id from OpenAI ``model`` field."""
     if not model:
         return None
     m = model.strip()
+    if m == "prismrag-general":
+        return "general"
     for prefix in ("prismrag-workspace-", "prismrag-ws-", "prismrag-kb-"):
         if m.startswith(prefix):
             try:
@@ -167,7 +169,19 @@ async def openai_list_models(
     kbs = result.scalars().all()
     created = int(time.time())
     data = []
+
+    # Always include a general model for independent usage
+    data.append(
+        {
+            "id": "prismrag-general",
+            "object": "model",
+            "created": created,
+            "owned_by": "prismrag",
+        }
+    )
+
     for kb in kbs:
+        # Avoid duplicate 'General' if it already exists as ID 1 or named 'General'
         mid = f"prismrag-workspace-{kb.id}"
         data.append(
             {
@@ -195,25 +209,62 @@ async def openai_chat_completions(
             detail="OpenAI-compatible API is disabled (PRISMRAG_OPENAI_COMPAT_ENABLED=false)",
         )
 
-    workspace_id = _parse_workspace_id(body.model)
-    if workspace_id is None:
+    kb_id_or_str = _parse_workspace_id(body.model)
+    if kb_id_or_str is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                "Unknown model. Use ids from GET /v1/models, e.g. "
-                "prismrag-workspace-1"
+                "Unknown model. Use ids from GET /v1/models, e.g. prismrag-workspace-1"
             ),
         )
 
-    kb_result = await db.execute(
-        select(KnowledgeBase).where(KnowledgeBase.id == workspace_id)
-    )
-    kb = kb_result.scalar_one_or_none()
+    kb = None
+    if kb_id_or_str == "general":
+        # Look for existing 'General' workspace or use ID 1 as default
+        kb_result = await db.execute(
+            select(KnowledgeBase).where(
+                (KnowledgeBase.id == 1)
+                | (KnowledgeBase.name == "General Knowledge Base")
+            )
+        )
+        kb = kb_result.scalar_one_or_none()
+        if kb is None:
+            # Auto-create the default workspace
+            kb = KnowledgeBase(
+                id=1,
+                name="General Knowledge Base",
+                description="Auto-provisioned workspace for external chat interfaces.",
+            )
+            try:
+                db.add(kb)
+                await db.commit()
+                await db.refresh(kb)
+            except Exception:
+                await db.rollback()
+                # If ID 1 is taken, let the DB assign a new one
+                kb = KnowledgeBase(
+                    name="General Knowledge Base",
+                    description="Auto-provisioned workspace for external chat interfaces.",
+                )
+                db.add(kb)
+                await db.commit()
+                await db.refresh(kb)
+    else:
+        # It's a specific ID (int)
+        kb_result = await db.execute(
+            select(KnowledgeBase).where(KnowledgeBase.id == kb_id_or_str)
+        )
+        kb = kb_result.scalar_one_or_none()
+
     if kb is None:
+        # If it was an ID that didn't exist
+        err_id = kb_id_or_str if kb_id_or_str != "general" else "1"
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Knowledge base (workspace) {workspace_id} not found",
+            detail=f"Knowledge base (workspace) {err_id} not found",
         )
+
+    workspace_id: int = kb.id
 
     from app.api.chat_prompt import DEFAULT_SYSTEM_PROMPT, HARD_SYSTEM_PROMPT
 
@@ -295,7 +346,8 @@ async def openai_chat_completions(
         ) from e
 
     answer = _publicize_backend_paths(
-        (answer_parts[0] if answer_parts else "").strip() or "Unable to generate a response.",
+        (answer_parts[0] if answer_parts else "").strip()
+        or "Unable to generate a response.",
         origin,
     )
 
@@ -396,9 +448,7 @@ async def _stream_openai_response(
                     piece = ed.get("text", "")
                     if piece:
                         sent_token = True
-                        yield _chunk_openai(
-                            completion_id, model_id, {"content": piece}
-                        )
+                        yield _chunk_openai(completion_id, model_id, {"content": piece})
                 elif et == "complete":
                     final_answer = ed.get("answer", "") or ""
                     final_sources = ed.get("sources") or []

@@ -7,13 +7,16 @@ Environment variables (optional):
     PRISMRAG_EMBEDDING_MODEL  — default: BAAI/bge-m3
     PRISMRAG_RERANKER_MODEL   — default: BAAI/bge-reranker-v2-m3
 """
+
 import os
 import sys
 
 
 def download_models():
     embedding_model = os.environ.get("PRISMRAG_EMBEDDING_MODEL", "BAAI/bge-m3")
-    reranker_model = os.environ.get("PRISMRAG_RERANKER_MODEL", "BAAI/bge-reranker-v2-m3")
+    reranker_model = os.environ.get(
+        "PRISMRAG_RERANKER_MODEL", "BAAI/bge-reranker-v2-m3"
+    )
 
     from sentence_transformers import SentenceTransformer, CrossEncoder
 

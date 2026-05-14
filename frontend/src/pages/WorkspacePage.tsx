@@ -1,6 +1,7 @@
-import { useMemo, useCallback, useEffect, useRef } from "react";
+import { useMemo, useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DataPanel } from "@/components/rag/DataPanel";
 import { ChatPanel } from "@/components/rag/ChatPanel";
@@ -8,14 +9,34 @@ import { VisualPanel } from "@/components/rag/VisualPanel";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useWorkspace, useUpdateWorkspace } from "@/hooks/useWorkspaces";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { Database, MessageSquare, PieChart } from "lucide-react";
+import { Group, Panel } from "react-resizable-panels";
+import { CustomResizableHandle } from "@/components/ui/resizable-handle";
 import type { Document, RAGStats, DocumentStatus, UpdateWorkspace } from "@/types";
 
 const PROCESSING_STATUSES = new Set<DocumentStatus>(["parsing", "indexing", "processing"]);
+const BREAKPOINT = 1200;
+
+type ViewTab = "data" | "chat" | "visual";
 
 export function WorkspacePage() {
+  const { t } = useTranslation();
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const queryClient = useQueryClient();
   const wsId = workspaceId ? Number(workspaceId) : null;
+
+  const [activeTab, setActiveTab] = useState<ViewTab>("chat");
+  const [isLargeScreen, setIsLargeScreen] = useState(window.innerWidth >= BREAKPOINT);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const large = window.innerWidth >= BREAKPOINT;
+      setIsLargeScreen(large);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // -- Workspace data --
   const { data: workspace } = useWorkspace(wsId);
@@ -83,19 +104,27 @@ export function WorkspacePage() {
   // -----------------------------------------------------------------------
   const uploadDoc = useMutation({
     mutationFn: ({
-      file,
+      files,
       customMetadata,
+      relativePaths,
     }: {
-      file: File;
+      files: File[];
       customMetadata?: { key: string; value: string }[];
-    }) => api.uploadFile<Document>(`/documents/upload/${workspaceId}`, file, customMetadata),
+      relativePaths?: string[];
+    }) =>
+      api.uploadFiles<Document>(
+        `/documents/upload/${workspaceId}`,
+        files,
+        customMetadata,
+        relativePaths,
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["documents", workspaceId] });
       queryClient.invalidateQueries({ queryKey: ["rag-stats", workspaceId] });
       queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-      toast.success("Document uploaded successfully");
+      toast.success(t("workspace.uploadSuccess"));
     },
-    onError: () => toast.error("Failed to upload document"),
+    onError: () => toast.error(t("workspace.uploadFailed")),
   });
 
   const deleteDoc = useMutation({
@@ -105,9 +134,9 @@ export function WorkspacePage() {
       queryClient.invalidateQueries({ queryKey: ["rag-stats", workspaceId] });
       queryClient.invalidateQueries({ queryKey: ["workspaces"] });
       if (selectedDoc?.id === docId) selectDoc(null);
-      toast.success("Document deleted");
+      toast.success(t("workspace.deleteSuccess"));
     },
-    onError: () => toast.error("Failed to delete document"),
+    onError: () => toast.error(t("workspace.deleteFailed")),
   });
 
   const processDoc = useMutation({
@@ -115,19 +144,18 @@ export function WorkspacePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["documents", workspaceId] });
       queryClient.invalidateQueries({ queryKey: ["rag-stats", workspaceId] });
-      toast.info("Analyzing document...", {
-        description: "Parsing content and building search index.",
+      toast.info(t("workspace.analyzing"), {
+        description: t("workspace.parsing"),
       });
     },
     onError: (error: Error) => {
       if (error.message?.includes("already being analyzed")) {
-        toast.info("Document is already being analyzed", {
-          description: "Please wait for the current analysis to complete.",
+        toast.info(t("workspace.alreadyAnalyzing"), {
+          description: t("workspace.alreadyAnalyzingDesc"),
         });
-        // Refresh to get latest status
         queryClient.invalidateQueries({ queryKey: ["documents", workspaceId] });
       } else {
-        toast.error("Failed to start analysis");
+        toast.error(t("workspace.startAnalysisFailed"));
       }
     },
   });
@@ -137,9 +165,9 @@ export function WorkspacePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["documents", workspaceId] });
       queryClient.invalidateQueries({ queryKey: ["rag-stats", workspaceId] });
-      toast.success("Document re-processing started");
+      toast.success(t("workspace.reprocessingStarted"));
     },
-    onError: () => toast.error("Failed to re-process document"),
+    onError: () => toast.error(t("workspace.reprocessingFailed")),
   });
 
   // -----------------------------------------------------------------------
@@ -152,9 +180,10 @@ export function WorkspacePage() {
         selectDoc(null);
       } else {
         selectDoc(doc);
+        if (!isLargeScreen) setActiveTab("visual");
       }
     },
-    [selectedDoc, selectDoc],
+    [selectedDoc, selectDoc, isLargeScreen],
   );
 
   const handleUpdateWorkspace = useCallback(
@@ -166,36 +195,116 @@ export function WorkspacePage() {
   );
 
   // -----------------------------------------------------------------------
-  // Render — 3-column layout
+  // Render
   // -----------------------------------------------------------------------
+
+  const commonProps = {
+    workspace,
+    documents,
+    docsLoading,
+    ragStats,
+    selectedDocId: selectedDoc?.id ?? null,
+    onSelectDoc: handleSelectDoc,
+    onUpload: (
+      files: File[],
+      customMetadata?: { key: string; value: string }[],
+      relativePaths?: string[],
+    ) => uploadDoc.mutate({ files, customMetadata, relativePaths }),
+    isUploading: uploadDoc.isPending,
+    onDelete: (id: number) => deleteDoc.mutate(id),
+    onProcess: (id: number) => processDoc.mutate(id),
+    onReindex: (id: number) => reindexDoc.mutate(id),
+    isProcessing: processDoc.isPending,
+    onUpdateWorkspace: handleUpdateWorkspace,
+  };
+
+  if (isLargeScreen) {
+    return (
+      <div className="h-full overflow-hidden">
+        <Group id="workspace-layout" orientation="horizontal" className="h-full">
+          <Panel id="data-panel" defaultSize="22%" minSize="22%" maxSize="40%" collapsible={true}>
+            <DataPanel {...commonProps} isMobile={false} />
+          </Panel>
+
+          <CustomResizableHandle />
+
+          <Panel id="chat-panel" defaultSize="40%" minSize="30%">
+            <ChatPanel
+              workspaceId={workspaceId || ""}
+              hasIndexedDocs={hasIndexedDocs}
+              workspace={workspace ?? null}
+            />
+          </Panel>
+
+          <CustomResizableHandle />
+
+          <Panel id="visual-panel" defaultSize="30%" minSize="20%">
+            <VisualPanel workspaceId={workspaceId || ""} hasDeepragDocs={hasDeepragDocs} />
+          </Panel>
+        </Group>
+      </div>
+    );
+  }
+
+  // Tabbed Mobile/Tablet Layout
   return (
-    <div className="h-full overflow-hidden grid grid-cols-[minmax(220px,20%)_minmax(300px,40%)_minmax(300px,40%)]">
-      {/* Column 1: Data Area */}
-      <DataPanel
-        workspace={workspace}
-        documents={documents}
-        docsLoading={docsLoading}
-        ragStats={ragStats}
-        selectedDocId={selectedDoc?.id ?? null}
-        onSelectDoc={handleSelectDoc}
-        onUpload={(file, customMetadata) => uploadDoc.mutate({ file, customMetadata })}
-        isUploading={uploadDoc.isPending}
-        onDelete={(id) => deleteDoc.mutate(id)}
-        onProcess={(id) => processDoc.mutate(id)}
-        onReindex={(id) => reindexDoc.mutate(id)}
-        isProcessing={processDoc.isPending}
-        onUpdateWorkspace={handleUpdateWorkspace}
-      />
+    <div className="h-full flex flex-col overflow-hidden bg-background">
+      {/* Mobile Tab Header */}
+      <div className="flex border-b border-border bg-card shrink-0 px-2 h-10">
+        <button
+          onClick={() => setActiveTab("data")}
+          className={cn(
+            "flex-1 flex items-center justify-center gap-2 text-xs font-medium transition-colors border-b-2",
+            activeTab === "data"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground",
+          )}
+        >
+          <Database className="w-3.5 h-3.5" />
+          <span>{t("workspace.data")}</span>
+        </button>
+        <button
+          onClick={() => setActiveTab("chat")}
+          className={cn(
+            "flex-1 flex items-center justify-center gap-2 text-xs font-medium transition-colors border-b-2",
+            activeTab === "chat"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground",
+          )}
+        >
+          <MessageSquare className="w-3.5 h-3.5" />
+          <span>{t("workspace.chat")}</span>
+        </button>
+        <button
+          onClick={() => setActiveTab("visual")}
+          className={cn(
+            "flex-1 flex items-center justify-center gap-2 text-xs font-medium transition-colors border-b-2",
+            activeTab === "visual"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground",
+          )}
+        >
+          <PieChart className="w-3.5 h-3.5" />
+          <span>{t("workspace.visual")}</span>
+        </button>
+      </div>
 
-      {/* Column 2: Chat Area */}
-      <ChatPanel
-        workspaceId={workspaceId || ""}
-        hasIndexedDocs={hasIndexedDocs}
-        workspace={workspace ?? null}
-      />
-
-      {/* Column 3: Visual Area */}
-      <VisualPanel workspaceId={workspaceId || ""} hasDeepragDocs={hasDeepragDocs} />
+      {/* Tab Content */}
+      <div className="flex-1 overflow-hidden relative">
+        <div className={cn("h-full", activeTab !== "data" && "hidden")}>
+          <DataPanel {...commonProps} isMobile={true} />
+        </div>
+        <div className={cn("h-full", activeTab !== "chat" && "hidden")}>
+          <ChatPanel
+            workspaceId={workspaceId || ""}
+            hasIndexedDocs={hasIndexedDocs}
+            workspace={workspace ?? null}
+          />
+        </div>
+        <div className={cn("h-full", activeTab !== "visual" && "hidden")}>
+          <VisualPanel workspaceId={workspaceId || ""} hasDeepragDocs={hasDeepragDocs} />
+        </div>
+      </div>
     </div>
   );
 }

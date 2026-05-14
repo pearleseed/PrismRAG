@@ -9,9 +9,9 @@ This directory holds **local-only** data and a dedicated virtual environment for
 | Requirement | Notes |
 |---|---|
 | **PrismRAG backend** | Must be running on `http://localhost:8080` (see root `./run_bk.sh`) |
-| **Repository setup** | Run `./setup.sh` once from the repo root. Step **[8/8]** creates `apps/open-webui/.venv` via **uv** with Python **3.12** or **3.11** *(PyPI `open-webui` does not support Python 3.13+)* |
+| **Repository setup** | Run `./setup.sh` once from the repo root. Step **[7/7]** creates `apps/open-webui/.venv` via **uv** with Python **3.12** or **3.11** *(PyPI `open-webui` does not support Python 3.13+)* |
 
-> **If step [8/8] fails:** run `uv python install 3.12` then `./setup.sh` again.
+> **If step [7/7] fails:** run `uv python install 3.12` then `./setup.sh` again.
 
 ---
 
@@ -51,6 +51,20 @@ Pick a **model** named `prismrag-workspace-<id>` — each maps to one of your kn
 
 ---
 
+## 🔗 Ingestion Bridge (Open WebUI Function)
+
+If you want Open WebUI to use PrismRAG's advanced document processing (Docling, Marker, Knowledge Graph) when you upload files in the chat:
+
+1.  Open **`apps/open-webui/prismrag_bridge.py`** and copy its content.
+2.  In Open WebUI, go to **Workspace → Functions**.
+3.  Click **+ Create** and paste the code.
+4.  **Save** and enable the **Global** toggle.
+5.  **Configure:** In the Function settings (Valves), ensure `PRISMRAG_API_URL` and `WEBUI_API_URL` are correct for your environment.
+
+Now, whenever you upload a file while using a `prismrag-workspace-X` model, it will automatically be synced and processed by the PrismRAG backend.
+
+---
+
 ## Rollback
 
 - Stop the Open WebUI process — nothing in the core backend or original frontend is affected.
@@ -64,4 +78,4 @@ Pick a **model** named `prismrag-workspace-<id>` — each maps to one of your kn
 |---|---|
 | `requirements.txt` | Pins the `open-webui` package version |
 | `data/` | Local SQLite database for Open WebUI *(gitignored)* |
-| `.venv/` | Python venv created by `./setup.sh` step **[8/8]** *(gitignored)* |
+| `.venv/` | Python venv created by `./setup.sh` step **[7/7]** *(gitignored)* |

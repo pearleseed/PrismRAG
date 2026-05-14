@@ -1,8 +1,8 @@
 #!/bin/bash
 # ============================================================
 # PrismRAG — Local Development Setup
-#   ./setup.sh                    — full install: venv/ (backend) + apps/open-webui/.venv/ (Open WebUI)
-#   ./setup.sh --serve-open-webui — start Open WebUI (separate venv; avoids marker-pdf vs open-webui conflicts)
+#   ./scripts/setup.sh                    — full install: venv/ (backend) + apps/open-webui/.venv/ (Open WebUI)
+#   ./scripts/setup.sh --serve-open-webui — start Open WebUI (separate venv; avoids marker-pdf vs open-webui conflicts)
 # ============================================================
 set -e
 
@@ -24,73 +24,9 @@ DOCS="📄"
 FOLDER="📁"
 LINK="🔗"
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$SCRIPT_DIR"
 
-# -----------------------------------------------------------
-# Open WebUI only — start server (apps/open-webui/.venv — not repo venv/)
-# Usage: ./setup.sh --serve-open-webui
-# -----------------------------------------------------------
-if [ "${1:-}" = "--serve-open-webui" ]; then
-    if ! command -v uv &>/dev/null; then
-        echo "ERROR: uv not found. Install: https://github.com/astral-sh/uv"
-        exit 1
-    fi
-    OW_DIR="$SCRIPT_DIR/apps/open-webui"
-    OW_VENV="$OW_DIR/.venv"
-    if [ ! -d "$OW_VENV" ] || [ ! -x "$OW_VENV/bin/python" ]; then
-        echo "Creating Open WebUI venv at $OW_VENV ..."
-        OW_PY=""
-        for ver in 3.12 3.11; do
-            if uv venv "$OW_VENV" --python "$ver" 2>/dev/null; then
-                OW_PY="$ver"
-                echo "  Created .venv with Python ${ver}"
-                break
-            fi
-            rm -rf "$OW_VENV"
-        done
-        if [ -z "$OW_PY" ]; then
-            uv venv "$OW_VENV"
-            echo "  Created .venv with default Python (if pip fails, run: uv python install 3.12 && retry)"
-        fi
-    fi
-    echo "Syncing Open WebUI dependencies with uv (apps/open-webui/.venv)..."
-    uv pip install --python "$OW_VENV/bin/python" -q -r "$OW_DIR/requirements.txt"
-    # shellcheck source=/dev/null
-    source "$OW_VENV/bin/activate"
-    mkdir -p "$OW_DIR/data"
-    ABS_DB="${OW_DIR}/data/webui.db"
-    export DATABASE_URL="${DATABASE_URL:-sqlite:////${ABS_DB}}"
-    export WEBUI_SECRET_KEY="${WEBUI_SECRET_KEY:-$("$OW_VENV/bin/python" -c 'import secrets; print(secrets.token_hex(24))')}"
-    # Primary IPv4 of this machine (default Open WebUI bind — not 0.0.0.0).
-    PRIMARY_IP="$("$OW_VENV/bin/python" -c 'import socket
-try:
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.settimeout(0.5)
-    s.connect(("8.8.8.8", 80))
-    print(s.getsockname()[0])
-    s.close()
-except Exception:
-    print("127.0.0.1")' 2>/dev/null || true)"
-    [ -z "$PRIMARY_IP" ] && PRIMARY_IP="127.0.0.1"
-    export OPENAI_API_BASE_URL="${OPENAI_API_BASE_URL:-http://127.0.0.1:8080/v1}"
-    export OPENAI_API_KEY="${OPENAI_API_KEY:-sk-local-prismrag}"
-    export ENABLE_OLLAMA_API="${ENABLE_OLLAMA_API:-false}"
-    export WEBUI_AUTH="${WEBUI_AUTH:-false}"
-    PORT="${OPEN_WEBUI_PORT:-3000}"
-    # Default: bind PRIMARY_IP (not 0.0.0.0). Set OPEN_WEBUI_HOST=0.0.0.0 for all interfaces.
-    if [ -n "${OPEN_WEBUI_HOST+x}" ]; then
-        BIND_HOST="${OPEN_WEBUI_HOST}"
-        [ -z "$BIND_HOST" ] && BIND_HOST="127.0.0.1"
-    else
-        BIND_HOST="$PRIMARY_IP"
-    fi
-    echo "Open WebUI → ${OPENAI_API_BASE_URL} (OPENAI_API_KEY is sent to PrismRAG /v1)"
-    echo "UI: http://${BIND_HOST}:${PORT}"
-    echo "  (bind address ${BIND_HOST}; OPEN_WEBUI_HOST=0.0.0.0 for all interfaces, 127.0.0.1 for localhost only)"
-    cd "$OW_DIR"
-    exec open-webui serve --host "$BIND_HOST" --port "$PORT"
-fi
 
 echo -e "${BLUE}${BOLD}============================================${NC}"
 echo -e "${BLUE}${BOLD}      PrismRAG — Local Development Setup    ${NC}"
@@ -312,9 +248,10 @@ echo -e "${BLUE}${BOLD}============================================${NC}"
 echo -e "${GREEN}${BOLD}    ${ROCKET} Setup Complete! ${ROCKET}    ${NC}"
 echo -e "${BLUE}${BOLD}============================================${NC}"
 echo ""
-echo -e "  ${GEAR}  Start backend:     ${BOLD}./run_bk.sh${NC}"
-echo -e "  ${GEAR}  Start frontend:    ${BOLD}./run_fe.sh${NC}"
-echo -e "  ${GEAR}  Open WebUI (opt): ${BOLD}./setup.sh --serve-open-webui${NC}"
+echo -e "  ${GEAR}  Start backend:     ${BOLD}./scripts/run/run_bk.sh${NC}
+  ${GEAR}  Start frontend:    ${BOLD}./scripts/run/run_fe.sh${NC}
+  ${GEAR}  Open WebUI (opt): ${BOLD}./scripts/run/run_ow.sh${NC}
+"
 echo -e "  ${LINK}  Open:              ${BLUE}${BOLD}http://localhost:5174${NC}"
 echo ""
 echo -e ""

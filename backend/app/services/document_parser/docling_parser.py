@@ -13,7 +13,7 @@ import re
 import time
 import uuid
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 
 from app.core.config import settings
 from app.services.document_parser.base import BaseDocumentParser
@@ -26,9 +26,52 @@ from app.services.models.parsed_document import (
 
 logger = logging.getLogger(__name__)
 
+
+def sanitize_text(text: Any | None) -> str:
+    """Remove null bytes (\x00) which are not allowed in PostgreSQL."""
+    if text is None:
+        return ""
+    return str(text).replace("\x00", "")
+
+
 # File extensions handled by Docling vs legacy
-_DOCLING_EXTENSIONS = {".pdf", ".docx", ".pptx", ".html"}
-_LEGACY_EXTENSIONS = {".txt", ".md"}
+_DOCLING_EXTENSIONS = {
+    ".pdf",
+    ".docx",
+    ".pptx",
+    ".xlsx",
+    ".html",
+    ".htm",
+    ".epub",
+    ".md",
+    ".txt",
+    ".csv",
+    ".xml",
+    ".nxml",
+    ".tex",
+    ".adoc",
+    ".asciidoc",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".tiff",
+    ".bmp",
+    ".wav",
+    ".mp3",
+    ".m4a",
+    ".aac",
+    ".ogg",
+    ".flac",
+    ".mp4",
+    ".avi",
+    ".mov",
+    ".webm",
+    ".mkv",
+    ".vtt",
+    ".xbrl",
+    ".json",
+}
+_LEGACY_EXTENSIONS = set()
 
 
 class DoclingDocumentParser(BaseDocumentParser):
@@ -56,26 +99,86 @@ class DoclingDocumentParser(BaseDocumentParser):
     # ------------------------------------------------------------------
 
     def _get_converter(self):
-        """Lazy-init Docling DocumentConverter with image extraction."""
+        """Lazy-init Docling DocumentConverter with support for all non-video formats."""
         if self._converter is not None:
             return self._converter
 
-        from docling.document_converter import DocumentConverter, PdfFormatOption
-        from docling.datamodel.pipeline_options import PdfPipelineOptions
+        from docling.document_converter import (
+            DocumentConverter,
+            PdfFormatOption,
+            WordFormatOption,
+            PowerpointFormatOption,
+            HTMLFormatOption,
+            MarkdownFormatOption,
+            ExcelFormatOption,
+            AudioFormatOption,
+            ImageFormatOption,
+            CsvFormatOption,
+            LatexFormatOption,
+            AsciiDocFormatOption,
+            XMLJatsFormatOption,
+            PatentUsptoFormatOption,
+            XBRLFormatOption,
+        )
+        from docling.datamodel.pipeline_options import (
+            PdfPipelineOptions,
+            AsrPipelineOptions,
+        )
+        from docling.datamodel.base_models import InputFormat
+        from docling.pipeline.asr_pipeline import AsrPipeline
+        from docling.datamodel import asr_model_specs
 
-        pipeline_options = PdfPipelineOptions()
-        pipeline_options.generate_picture_images = (
-            settings.PRISMRAG_ENABLE_IMAGE_EXTRACTION
-        )
-        pipeline_options.images_scale = settings.PRISMRAG_DOCLING_IMAGES_SCALE
-        pipeline_options.do_formula_enrichment = (
-            settings.PRISMRAG_ENABLE_FORMULA_ENRICHMENT
-        )
+        # 1. Configure PDF Options
+        pdf_options = PdfPipelineOptions()
+        pdf_options.generate_picture_images = settings.PRISMRAG_ENABLE_IMAGE_EXTRACTION
+        pdf_options.images_scale = settings.PRISMRAG_DOCLING_IMAGES_SCALE
+        pdf_options.do_formula_enrichment = settings.PRISMRAG_ENABLE_FORMULA_ENRICHMENT
+        pdf_options.do_ocr = True
+        pdf_options.do_table_structure = True
+
+        # 2. Configure ASR Options for Audio
+        asr_options = AsrPipelineOptions()
+        # Default to Whisper Turbo as recommended in latest docs
+        asr_options.asr_options = asr_model_specs.WHISPER_TURBO
 
         self._converter = DocumentConverter(
+            allowed_formats=[
+                InputFormat.PDF,
+                InputFormat.DOCX,
+                InputFormat.PPTX,
+                InputFormat.XLSX,
+                InputFormat.HTML,
+                InputFormat.MD,
+                InputFormat.IMAGE,
+                InputFormat.CSV,
+                InputFormat.XML_JATS,
+                InputFormat.XML_USPTO,
+                InputFormat.XML_XBRL,
+                InputFormat.LATEX,
+                InputFormat.ASCIIDOC,
+                InputFormat.AUDIO,
+                InputFormat.VTT,
+                InputFormat.JSON_DOCLING,
+            ],
             format_options={
-                "pdf": PdfFormatOption(pipeline_options=pipeline_options),
-            }  # ty:ignore[invalid-argument-type]
+                InputFormat.PDF: PdfFormatOption(pipeline_options=pdf_options),
+                InputFormat.DOCX: WordFormatOption(),
+                InputFormat.PPTX: PowerpointFormatOption(),
+                InputFormat.XLSX: ExcelFormatOption(),
+                InputFormat.HTML: HTMLFormatOption(),
+                InputFormat.MD: MarkdownFormatOption(),
+                InputFormat.AUDIO: AudioFormatOption(
+                    pipeline_cls=AsrPipeline,
+                    pipeline_options=asr_options,
+                ),
+                InputFormat.IMAGE: ImageFormatOption(),
+                InputFormat.CSV: CsvFormatOption(),
+                InputFormat.LATEX: LatexFormatOption(),
+                InputFormat.ASCIIDOC: AsciiDocFormatOption(),
+                InputFormat.XML_JATS: XMLJatsFormatOption(),
+                InputFormat.XML_USPTO: PatentUsptoFormatOption(),
+                InputFormat.XML_XBRL: XBRLFormatOption(),
+            },
         )
         return self._converter
 
@@ -289,7 +392,7 @@ class DoclingDocumentParser(BaseDocumentParser):
 
             chunks.append(
                 EnrichedChunk(
-                    content=enriched_text,
+                    content=sanitize_text(enriched_text),
                     chunk_index=i,
                     source_file=original_filename,
                     document_id=document_id,
@@ -397,7 +500,7 @@ class DoclingDocumentParser(BaseDocumentParser):
                         document_id=document_id,
                         page_no=page_no,
                         file_path=str(image_path),
-                        caption=caption,
+                        caption=sanitize_text(caption),
                         width=width,
                         height=height,
                     )
@@ -506,7 +609,7 @@ class DoclingDocumentParser(BaseDocumentParser):
                     table_id=table_id,
                     document_id=document_id,
                     page_no=page_no,
-                    content_markdown=content_md,
+                    content_markdown=sanitize_text(content_md),
                     num_rows=num_rows,
                     num_cols=num_cols,
                 )

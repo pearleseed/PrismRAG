@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Optional
+from typing import Optional, Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
@@ -31,6 +31,14 @@ from app.services.models.parsed_document import DeepRetrievalResult
 from app.services.chunk_dedup import deduplicate_chunks
 
 logger = logging.getLogger(__name__)
+
+
+def sanitize_text(text: Any | None) -> str:
+    """Remove null bytes (\x00) which are not allowed in PostgreSQL."""
+    if text is None:
+        return ""
+    # Ensure it's a string and strip null bytes
+    return str(text).replace("\x00", "")
 
 
 class PrismRAGService:
@@ -116,7 +124,7 @@ class PrismRAGService:
             )
 
             # Save markdown + images to DB
-            document.markdown_content = parsed.markdown
+            document.markdown_content = sanitize_text(parsed.markdown)
             document.page_count = parsed.page_count
             document.table_count = parsed.tables_count
             document.parser_version = self.parser.parser_name
@@ -135,7 +143,7 @@ class PrismRAGService:
                     image_id=img.image_id,
                     page_no=img.page_no,
                     file_path=img.file_path,
-                    caption=img.caption,
+                    caption=sanitize_text(img.caption),
                     width=img.width,
                     height=img.height,
                     mime_type=img.mime_type,
@@ -157,8 +165,8 @@ class PrismRAGService:
                     document_id=document_id,
                     table_id=tbl.table_id,
                     page_no=tbl.page_no,
-                    content_markdown=tbl.content_markdown,
-                    caption=tbl.caption,
+                    content_markdown=sanitize_text(tbl.content_markdown),
+                    caption=sanitize_text(tbl.caption),
                     num_rows=tbl.num_rows,
                     num_cols=tbl.num_cols,
                 )
@@ -263,7 +271,7 @@ class PrismRAGService:
         except Exception as e:
             logger.error(f"PrismRAG failed for document {document_id}: {e}")
             document.status = DocumentStatus.FAILED
-            document.error_message = str(e)[:500]
+            document.error_message = sanitize_text(str(e))[:500]
             await self.db.commit()
             raise
 

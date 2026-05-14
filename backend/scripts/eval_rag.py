@@ -30,9 +30,11 @@ TIMEOUT = 120  # seconds per request
 
 # ── Data structures ───────────────────────────────────────────────────────────
 
+
 @dataclass
 class TestCase:
     """A single evaluation test case."""
+
     id: str
     category: str  # fact_extraction, table_data, cross_doc, anti_hallucination, history, citation
     question: str
@@ -52,6 +54,7 @@ class TestCase:
 @dataclass
 class MetricResult:
     """Result of a single metric evaluation."""
+
     name: str
     score: float  # 0.0 - 1.0
     passed: bool
@@ -61,6 +64,7 @@ class MetricResult:
 @dataclass
 class TestResult:
     """Full evaluation result for a test case."""
+
     test_id: str
     category: str
     question: str
@@ -73,6 +77,7 @@ class TestResult:
 
 
 # ── Test Dataset ──────────────────────────────────────────────────────────────
+
 
 def build_test_cases(workspace_id: int) -> list[TestCase]:
     """
@@ -185,8 +190,14 @@ def build_test_cases(workspace_id: int) -> list[TestCase]:
             question="Mảng nào tăng trưởng mạnh nhất?",
             language="vi",
             history=[
-                {"role": "user", "content": "TechVina có những mảng kinh doanh chính nào?"},
-                {"role": "assistant", "content": "TechVina có 4 mảng kinh doanh chính:\n1. Giải pháp phần mềm: 1.890 tỷ VNĐ\n2. Dịch vụ Cloud: 1.520 tỷ VNĐ\n3. AI Platform: 900 tỷ VNĐ\n4. Tư vấn & Triển khai: 540 tỷ VNĐ"},
+                {
+                    "role": "user",
+                    "content": "TechVina có những mảng kinh doanh chính nào?",
+                },
+                {
+                    "role": "assistant",
+                    "content": "TechVina có 4 mảng kinh doanh chính:\n1. Giải pháp phần mềm: 1.890 tỷ VNĐ\n2. Dịch vụ Cloud: 1.520 tỷ VNĐ\n3. AI Platform: 900 tỷ VNĐ\n4. Tư vấn & Triển khai: 540 tỷ VNĐ",
+                },
             ],
             expected_keywords=["AI Platform", "66", "67"],
         ),
@@ -196,8 +207,14 @@ def build_test_cases(workspace_id: int) -> list[TestCase]:
             question="Giải thích chi tiết hơn về điểm đầu tiên",
             language="vi",
             history=[
-                {"role": "user", "content": "DeepSeek-V3.2 có những đặc điểm kỹ thuật nào nổi bật?"},
-                {"role": "assistant", "content": "DeepSeek-V3.2 có 3 đặc điểm kỹ thuật nổi bật:\n1. DeepSeek Sparse Attention (DSA) - cơ chế attention hiệu quả\n2. Scalable RL framework - mở rộng tính toán post-training\n3. Agentic Task Synthesis - pipeline tạo dữ liệu cho agent"},
+                {
+                    "role": "user",
+                    "content": "DeepSeek-V3.2 có những đặc điểm kỹ thuật nào nổi bật?",
+                },
+                {
+                    "role": "assistant",
+                    "content": "DeepSeek-V3.2 có 3 đặc điểm kỹ thuật nổi bật:\n1. DeepSeek Sparse Attention (DSA) - cơ chế attention hiệu quả\n2. Scalable RL framework - mở rộng tính toán post-training\n3. Agentic Task Synthesis - pipeline tạo dữ liệu cho agent",
+                },
             ],
             expected_keywords=["DSA", "Sparse Attention", "lightning", "indexer"],
         ),
@@ -214,6 +231,7 @@ def build_test_cases(workspace_id: int) -> list[TestCase]:
 
 
 # ── Rule-based metrics (no LLM needed) ────────────────────────────────────
+
 
 def eval_keyword_coverage(tc: TestCase) -> MetricResult:
     """Check if expected keywords appear in the answer."""
@@ -265,16 +283,25 @@ def eval_refusal_accuracy(tc: TestCase) -> MetricResult:
         if refusal_hits > 0:
             return MetricResult("refusal_accuracy", 1.0, True, "Correctly refused")
         else:
-            return MetricResult("refusal_accuracy", 0.0, False,
-                                "Should have refused but answered")
+            return MetricResult(
+                "refusal_accuracy", 0.0, False, "Should have refused but answered"
+            )
     else:
         if is_full_refusal:
-            return MetricResult("refusal_accuracy", 0.0, False,
-                                "Over-refusal: entire answer is a refusal")
+            return MetricResult(
+                "refusal_accuracy",
+                0.0,
+                False,
+                "Over-refusal: entire answer is a refusal",
+            )
         elif is_partial_gap:
             # Answer provides some data but notes gaps — this is acceptable behavior
-            return MetricResult("refusal_accuracy", 0.8, True,
-                                "Partial answer with noted gaps (acceptable)")
+            return MetricResult(
+                "refusal_accuracy",
+                0.8,
+                True,
+                "Partial answer with noted gaps (acceptable)",
+            )
         else:
             return MetricResult("refusal_accuracy", 1.0, True, "Correctly answered")
 
@@ -288,31 +315,46 @@ def eval_phantom_citations(tc: TestCase) -> MetricResult:
 
     Does NOT flag if the answer provides useful data with citations + notes some gaps.
     """
-    refusal_phrases = ["không chứa", "không có thông tin", "not contain", "no information"]
+    refusal_phrases = [
+        "không chứa",
+        "không có thông tin",
+        "not contain",
+        "no information",
+    ]
     answer_lower = tc.answer.lower()
     word_count = len(tc.answer.split())
 
     # Full refusal with citations = phantom
-    is_full_refusal = any(p in answer_lower for p in refusal_phrases) and word_count < 20
-    all_citations = re.findall(r'\[(?:IMG-)?\d+\]', tc.answer)
+    is_full_refusal = (
+        any(p in answer_lower for p in refusal_phrases) and word_count < 20
+    )
+    all_citations = re.findall(r"\[(?:IMG-)?\d+\]", tc.answer)
 
     if is_full_refusal and all_citations:
-        return MetricResult("no_phantom_citations", 0.0, False,
-                            f"Phantom citations on full refusal: {all_citations}")
+        return MetricResult(
+            "no_phantom_citations",
+            0.0,
+            False,
+            f"Phantom citations on full refusal: {all_citations}",
+        )
 
     # Check for citations IN refusal sentences specifically
-    sentences = re.split(r'[.!?\n]', tc.answer)
+    sentences = re.split(r"[.!?\n]", tc.answer)
     phantom_in_sentence = []
     for sent in sentences:
         sent_lower = sent.lower().strip()
         if any(p in sent_lower for p in refusal_phrases):
-            sent_citations = re.findall(r'\[(?:IMG-)?\d+\]', sent)
+            sent_citations = re.findall(r"\[(?:IMG-)?\d+\]", sent)
             if sent_citations:
                 phantom_in_sentence.extend(sent_citations)
 
     if phantom_in_sentence:
-        return MetricResult("no_phantom_citations", 0.3, False,
-                            f"Citations in refusal sentences: {phantom_in_sentence}")
+        return MetricResult(
+            "no_phantom_citations",
+            0.3,
+            False,
+            f"Citations in refusal sentences: {phantom_in_sentence}",
+        )
 
     return MetricResult("no_phantom_citations", 1.0, True, "No phantom citations")
 
@@ -320,26 +362,30 @@ def eval_phantom_citations(tc: TestCase) -> MetricResult:
 def eval_citation_format(tc: TestCase) -> MetricResult:
     """Check citation format: [1] [2] not [1, 2] or [1][2]."""
     # Check for grouped citations (bad: [1, 2] or [1,2])
-    grouped = re.findall(r'\[\d+[,\s]+\d+\]', tc.answer)
+    grouped = re.findall(r"\[\d+[,\s]+\d+\]", tc.answer)
     if grouped:
-        return MetricResult("citation_format", 0.0, False,
-                            f"Grouped citations found: {grouped}")
+        return MetricResult(
+            "citation_format", 0.0, False, f"Grouped citations found: {grouped}"
+        )
     return MetricResult("citation_format", 1.0, True, "Citations properly formatted")
 
 
 def eval_token_artifacts(tc: TestCase) -> MetricResult:
     """Check for Gemini token artifacts like <unusedNNN>."""
-    artifacts = re.findall(r'<unused\d+>:?\s*', tc.answer)
+    artifacts = re.findall(r"<unused\d+>:?\s*", tc.answer)
     if artifacts:
-        return MetricResult("no_token_artifacts", 0.0, False,
-                            f"Token artifacts: {artifacts}")
+        return MetricResult(
+            "no_token_artifacts", 0.0, False, f"Token artifacts: {artifacts}"
+        )
     return MetricResult("no_token_artifacts", 1.0, True, "No token artifacts")
 
 
 def eval_language_match(tc: TestCase) -> MetricResult:
     """Check if answer language matches question language."""
     # Simple heuristic: Vietnamese has many diacritical marks
-    vn_chars = set("áàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ")
+    vn_chars = set(
+        "áàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ"
+    )
     vn_count = sum(1 for c in tc.answer.lower() if c in vn_chars)
     total_alpha = sum(1 for c in tc.answer if c.isalpha())
 
@@ -352,11 +398,19 @@ def eval_language_match(tc: TestCase) -> MetricResult:
         # Vietnamese question should get Vietnamese answer
         # Allow some English (technical terms), but at least 5% VN chars
         if vn_ratio > 0.03:
-            return MetricResult("language_match", 1.0, True,
-                                f"Vietnamese content detected ({vn_ratio:.1%})")
+            return MetricResult(
+                "language_match",
+                1.0,
+                True,
+                f"Vietnamese content detected ({vn_ratio:.1%})",
+            )
         else:
-            return MetricResult("language_match", 0.0, False,
-                                f"Expected Vietnamese but got mostly English ({vn_ratio:.1%})")
+            return MetricResult(
+                "language_match",
+                0.0,
+                False,
+                f"Expected Vietnamese but got mostly English ({vn_ratio:.1%})",
+            )
     else:
         return MetricResult("language_match", 1.0, True, "English response OK")
 
@@ -368,35 +422,45 @@ def eval_answer_completeness(tc: TestCase) -> MetricResult:
 
     word_count = len(tc.answer.split())
     if word_count < 10:
-        return MetricResult("answer_completeness", 0.2, False,
-                            f"Answer too short ({word_count} words)")
+        return MetricResult(
+            "answer_completeness", 0.2, False, f"Answer too short ({word_count} words)"
+        )
     elif word_count < 30:
-        return MetricResult("answer_completeness", 0.6, True,
-                            f"Brief answer ({word_count} words)")
+        return MetricResult(
+            "answer_completeness", 0.6, True, f"Brief answer ({word_count} words)"
+        )
     else:
-        return MetricResult("answer_completeness", 1.0, True,
-                            f"Detailed answer ({word_count} words)")
+        return MetricResult(
+            "answer_completeness", 1.0, True, f"Detailed answer ({word_count} words)"
+        )
 
 
 def eval_context_utilization(tc: TestCase) -> MetricResult:
     """Check if retrieved contexts are actually being cited in the answer."""
     if tc.expected_refuse or tc.source_count == 0:
-        return MetricResult("context_utilization", 1.0, True, "Skip — refusal or no sources")
+        return MetricResult(
+            "context_utilization", 1.0, True, "Skip — refusal or no sources"
+        )
 
-    citations = re.findall(r'\[(\d+)\]', tc.answer)
+    citations = re.findall(r"\[(\d+)\]", tc.answer)
     cited_indices = set(int(c) for c in citations)
     if not cited_indices:
-        return MetricResult("context_utilization", 0.0, False,
-                            "Answer uses sources but cites none")
+        return MetricResult(
+            "context_utilization", 0.0, False, "Answer uses sources but cites none"
+        )
 
     ratio = len(cited_indices) / max(tc.source_count, 1)
     score = min(ratio, 1.0)
-    return MetricResult("context_utilization", score,
-                        score >= 0.2,
-                        f"Cited {len(cited_indices)}/{tc.source_count} sources")
+    return MetricResult(
+        "context_utilization",
+        score,
+        score >= 0.2,
+        f"Cited {len(cited_indices)}/{tc.source_count} sources",
+    )
 
 
 # ── LLM-as-judge metrics via DeepEval ─────────────────────────────────────
+
 
 def get_deepeval_model(judge: str):
     """Get DeepEval model wrapper for the judge LLM."""
@@ -411,6 +475,7 @@ def get_deepeval_model(judge: str):
             def load_model(self):
                 from google import genai
                 import os
+
                 return genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
             def generate(self, prompt: str, schema=None) -> str:
@@ -482,40 +547,59 @@ def run_deepeval_metrics(tc: TestCase, judge_model) -> list[MetricResult]:
         deepeval_tc = LLMTestCase(
             input=tc.question,
             actual_output=tc.answer,
-            retrieval_context=tc.retrieved_contexts[:5],  # Limit to avoid token overflow
+            retrieval_context=tc.retrieved_contexts[
+                :5
+            ],  # Limit to avoid token overflow
         )
 
         metrics = [
             ("faithfulness", FaithfulnessMetric(model=judge_model, threshold=0.7)),
-            ("answer_relevancy", AnswerRelevancyMetric(model=judge_model, threshold=0.7)),
-            ("context_relevancy", ContextualRelevancyMetric(model=judge_model, threshold=0.5)),
+            (
+                "answer_relevancy",
+                AnswerRelevancyMetric(model=judge_model, threshold=0.7),
+            ),
+            (
+                "context_relevancy",
+                ContextualRelevancyMetric(model=judge_model, threshold=0.5),
+            ),
         ]
 
         for name, metric in metrics:
             try:
                 metric.measure(deepeval_tc)
-                results.append(MetricResult(
-                    name=name,
-                    score=metric.score or 0.0,
-                    passed=metric.is_successful(),
-                    reason=str(metric.reason)[:200] if metric.reason else "",
-                ))
+                results.append(
+                    MetricResult(
+                        name=name,
+                        score=metric.score or 0.0,
+                        passed=metric.is_successful(),
+                        reason=str(metric.reason)[:200] if metric.reason else "",
+                    )
+                )
             except Exception as e:
-                results.append(MetricResult(
-                    name=name, score=0.0, passed=False,
-                    reason=f"Error: {str(e)[:150]}",
-                ))
+                results.append(
+                    MetricResult(
+                        name=name,
+                        score=0.0,
+                        passed=False,
+                        reason=f"Error: {str(e)[:150]}",
+                    )
+                )
 
     except Exception as e:
-        results.append(MetricResult(
-            name="deepeval_error", score=0.0, passed=False,
-            reason=f"DeepEval setup error: {str(e)[:200]}",
-        ))
+        results.append(
+            MetricResult(
+                name="deepeval_error",
+                score=0.0,
+                passed=False,
+                reason=f"DeepEval setup error: {str(e)[:200]}",
+            )
+        )
 
     return results
 
 
 # ── Main evaluation runner ────────────────────────────────────────────────
+
 
 def call_debug_chat(workspace_id: int, tc: TestCase) -> dict:
     """Call the debug-chat endpoint and return full response."""
@@ -583,10 +667,18 @@ def print_results_table(results: list[TestResult], show_llm: bool = False):
     print("=" * 120)
 
     for r in results:
-        status = "PASS" if r.overall_score >= 0.7 else "PARTIAL" if r.overall_score >= 0.5 else "FAIL"
+        status = (
+            "PASS"
+            if r.overall_score >= 0.7
+            else "PARTIAL"
+            if r.overall_score >= 0.5
+            else "FAIL"
+        )
         icon = "✓" if status == "PASS" else "~" if status == "PARTIAL" else "✗"
 
-        print(f"\n{icon} [{r.test_id}] ({r.category}) score={r.overall_score:.2f} | {r.latency_ms:.0f}ms | {r.source_count} sources")
+        print(
+            f"\n{icon} [{r.test_id}] ({r.category}) score={r.overall_score:.2f} | {r.latency_ms:.0f}ms | {r.source_count} sources"
+        )
         print(f"  Q: {r.question}")
         print(f"  A: {r.answer_preview}")
 
@@ -605,7 +697,9 @@ def print_results_table(results: list[TestResult], show_llm: bool = False):
     for r in results:
         categories.setdefault(r.category, []).append(r)
 
-    print(f"\n{'Category':<22} {'Tests':>5} {'Pass':>5} {'Avg Score':>10} {'Avg Latency':>12}")
+    print(
+        f"\n{'Category':<22} {'Tests':>5} {'Pass':>5} {'Avg Score':>10} {'Avg Latency':>12}"
+    )
     print("-" * 60)
 
     for cat, cat_results in sorted(categories.items()):
@@ -613,7 +707,9 @@ def print_results_table(results: list[TestResult], show_llm: bool = False):
         passed = sum(1 for r in cat_results if r.overall_score >= 0.7)
         avg_score = sum(r.overall_score for r in cat_results) / total
         avg_latency = sum(r.latency_ms for r in cat_results) / total
-        print(f"{cat:<22} {total:>5} {passed:>5} {avg_score:>9.2f} {avg_latency:>10.0f}ms")
+        print(
+            f"{cat:<22} {total:>5} {passed:>5} {avg_score:>9.2f} {avg_latency:>10.0f}ms"
+        )
 
     # ── Summary by metric ──
     print("\n" + "=" * 120)
@@ -644,8 +740,10 @@ def print_results_table(results: list[TestResult], show_llm: bool = False):
     pass_count = sum(1 for s in all_scores if s >= 0.7)
     total_tests = len(results)
 
-    print(f"OVERALL SCORE: {avg_overall:.2f} | PASS: {pass_count}/{total_tests} | "
-          f"AVG LATENCY: {sum(r.latency_ms for r in results) / total_tests:.0f}ms")
+    print(
+        f"OVERALL SCORE: {avg_overall:.2f} | PASS: {pass_count}/{total_tests} | "
+        f"AVG LATENCY: {sum(r.latency_ms for r in results) / total_tests:.0f}ms"
+    )
     print("=" * 120)
 
     # ── Final verdict ──
@@ -662,8 +760,12 @@ def print_results_table(results: list[TestResult], show_llm: bool = False):
 def main():
     parser = argparse.ArgumentParser(description="PrismRAG Evaluation")
     parser.add_argument("--workspace", type=int, default=11, help="Workspace ID")
-    parser.add_argument("--judge", choices=["ollama", "gemini", "none"], default="none",
-                        help="LLM judge for DeepEval metrics (default: none = rule-based only)")
+    parser.add_argument(
+        "--judge",
+        choices=["ollama", "gemini", "none"],
+        default="none",
+        help="LLM judge for DeepEval metrics (default: none = rule-based only)",
+    )
     parser.add_argument("--test-ids", nargs="*", help="Run specific test IDs only")
     args = parser.parse_args()
 
@@ -700,7 +802,11 @@ def main():
     # Run evaluation
     results: list[TestResult] = []
     for i, tc in enumerate(test_cases):
-        print(f"[{i+1}/{len(test_cases)}] {tc.id}: {tc.question[:50]}...", end=" ", flush=True)
+        print(
+            f"[{i + 1}/{len(test_cases)}] {tc.id}: {tc.question[:50]}...",
+            end=" ",
+            flush=True,
+        )
 
         try:
             data = call_debug_chat(args.workspace, tc)
@@ -710,8 +816,7 @@ def main():
 
             # Extract retrieved contexts for DeepEval
             tc.retrieved_contexts = [
-                s.get("content_preview", "")
-                for s in data.get("retrieved_sources", [])
+                s.get("content_preview", "") for s in data.get("retrieved_sources", [])
             ]
 
             result = evaluate_test_case(tc, judge_model)
@@ -722,12 +827,18 @@ def main():
 
         except Exception as e:
             print(f"ERROR: {e}")
-            results.append(TestResult(
-                test_id=tc.id, category=tc.category,
-                question=tc.question[:60], language=tc.language,
-                answer_preview=f"ERROR: {e}", source_count=0,
-                latency_ms=0, overall_score=0.0,
-            ))
+            results.append(
+                TestResult(
+                    test_id=tc.id,
+                    category=tc.category,
+                    question=tc.question[:60],
+                    language=tc.language,
+                    answer_preview=f"ERROR: {e}",
+                    source_count=0,
+                    latency_ms=0,
+                    overall_score=0.0,
+                )
+            )
 
     # Print results
     print_results_table(results, show_llm=(args.judge != "none"))
@@ -736,16 +847,26 @@ def main():
     output_path = Path(__file__).parent / "eval_results.json"
     json_results = []
     for r in results:
-        json_results.append({
-            "test_id": r.test_id,
-            "category": r.category,
-            "question": r.question,
-            "language": r.language,
-            "overall_score": r.overall_score,
-            "source_count": r.source_count,
-            "latency_ms": r.latency_ms,
-            "metrics": [{"name": m.name, "score": m.score, "passed": m.passed, "reason": m.reason} for m in r.metrics],
-        })
+        json_results.append(
+            {
+                "test_id": r.test_id,
+                "category": r.category,
+                "question": r.question,
+                "language": r.language,
+                "overall_score": r.overall_score,
+                "source_count": r.source_count,
+                "latency_ms": r.latency_ms,
+                "metrics": [
+                    {
+                        "name": m.name,
+                        "score": m.score,
+                        "passed": m.passed,
+                        "reason": m.reason,
+                    }
+                    for m in r.metrics
+                ],
+            }
+        )
     output_path.write_text(json.dumps(json_results, indent=2, ensure_ascii=False))
     print(f"\nResults saved to: {output_path}")
 

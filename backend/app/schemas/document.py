@@ -29,6 +29,7 @@ class DocumentResponse(DocumentBase):
     parser_version: str | None = None
     processing_time_ms: int = 0
     custom_metadata: dict | None = None
+    relative_path: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -37,4 +38,8 @@ class DocumentUploadResponse(BaseModel):
     id: int
     filename: str
     status: DocumentStatus
+
+
+class BulkUploadResponse(BaseModel):
+    documents: list[DocumentUploadResponse]
     message: str

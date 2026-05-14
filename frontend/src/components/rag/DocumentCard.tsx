@@ -1,5 +1,6 @@
 import { memo, useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import {
   FileText,
   FileType,
@@ -40,17 +41,42 @@ function getFileConfig(fileType: string) {
 // ---------------------------------------------------------------------------
 const STATUS_CONFIG: Record<
   DocumentStatus,
-  { label: string; className: string; icon: typeof CheckCircle2 }
+  { labelKey: string; className: string; icon: typeof CheckCircle2 }
 > = {
-  pending: { label: "Pending", className: "bg-muted text-muted-foreground", icon: Clock },
-  parsing: { label: "Parsing", className: "bg-blue-400/15 text-blue-400", icon: Loader2 },
-  indexing: { label: "Indexing", className: "bg-amber-400/15 text-amber-400", icon: Loader2 },
-  processing: { label: "Processing", className: "bg-amber-400/15 text-amber-400", icon: Loader2 },
-  indexed: { label: "Indexed", className: "bg-primary/15 text-primary", icon: CheckCircle2 },
-  failed: { label: "Failed", className: "bg-destructive/15 text-destructive", icon: XCircle },
+  pending: {
+    labelKey: "workspace.status.pending",
+    className: "bg-muted text-muted-foreground",
+    icon: Clock,
+  },
+  parsing: {
+    labelKey: "workspace.status.parsing",
+    className: "bg-blue-400/15 text-blue-400",
+    icon: Loader2,
+  },
+  indexing: {
+    labelKey: "workspace.status.indexing",
+    className: "bg-amber-400/15 text-amber-400",
+    icon: Loader2,
+  },
+  processing: {
+    labelKey: "workspace.status.processing",
+    className: "bg-amber-400/15 text-amber-400",
+    icon: Loader2,
+  },
+  indexed: {
+    labelKey: "workspace.status.indexed",
+    className: "bg-primary/15 text-primary",
+    icon: CheckCircle2,
+  },
+  failed: {
+    labelKey: "workspace.status.failed",
+    className: "bg-destructive/15 text-destructive",
+    icon: XCircle,
+  },
 };
 
 function StatusBadge({ status }: { status: DocumentStatus }) {
+  const { t } = useTranslation();
   const config = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
   const Icon = config.icon;
   const isAnimated = status === "parsing" || status === "indexing" || status === "processing";
@@ -63,7 +89,7 @@ function StatusBadge({ status }: { status: DocumentStatus }) {
       )}
     >
       <Icon className={cn("w-3 h-3", isAnimated && "animate-spin")} />
-      {config.label}
+      {t(config.labelKey)}
     </span>
   );
 }
@@ -72,21 +98,23 @@ function StatusBadge({ status }: { status: DocumentStatus }) {
 // Metadata chips
 // ---------------------------------------------------------------------------
 function MetadataChips({ doc }: { doc: Document }) {
-  const chips: { label: string; value: number }[] = [];
-  if (doc.page_count && doc.page_count > 0) chips.push({ label: "pages", value: doc.page_count });
-  if (doc.chunk_count > 0) chips.push({ label: "chunks", value: doc.chunk_count });
+  const { t } = useTranslation();
+  const chips: { labelKey: string; value: number }[] = [];
+  if (doc.page_count && doc.page_count > 0)
+    chips.push({ labelKey: "workspace.pages", value: doc.page_count });
+  if (doc.chunk_count > 0) chips.push({ labelKey: "workspace.chunks", value: doc.chunk_count });
   if (doc.image_count && doc.image_count > 0)
-    chips.push({ label: "images", value: doc.image_count });
+    chips.push({ labelKey: "workspace.images", value: doc.image_count });
   if (doc.table_count && doc.table_count > 0)
-    chips.push({ label: "tables", value: doc.table_count });
+    chips.push({ labelKey: "workspace.tables", value: doc.table_count });
 
   if (chips.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-2 mt-1">
+    <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 mt-1">
       {chips.map((c) => (
-        <span key={c.label} className="text-xs text-muted-foreground">
-          {c.value} {c.label}
+        <span key={c.labelKey} className="text-[11px] text-muted-foreground">
+          {c.value} {t(c.labelKey)}
         </span>
       ))}
     </div>
@@ -115,6 +143,7 @@ export const DocumentCard = memo(function DocumentCard({
   isProcessing,
   onClick,
 }: DocumentCardProps) {
+  const { t } = useTranslation();
   const fileConfig = getFileConfig(doc.file_type);
   const FileIcon = fileConfig.icon;
   const sizeStr =
@@ -147,8 +176,8 @@ export const DocumentCard = memo(function DocumentCard({
   const [justTriggered, setJustTriggered] = useState(false);
   useEffect(() => {
     if (justTriggered) {
-      const t = setTimeout(() => setJustTriggered(false), 1200);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => setJustTriggered(false), 1200);
+      return () => clearTimeout(timer);
     }
   }, [justTriggered]);
 
@@ -170,7 +199,7 @@ export const DocumentCard = memo(function DocumentCard({
       exit={{ opacity: 0, y: -8 }}
       transition={justTriggered ? { duration: 0.4 } : undefined}
       className={cn(
-        "group relative rounded-lg border bg-card transition-all duration-200",
+        "group relative rounded-lg border bg-card transition-all duration-200 @container",
         // Active processing state — animated border glow
         isActive
           ? "border-blue-400/50 shadow-[0_0_12px_-3px_rgba(96,165,250,0.3)]"
@@ -216,7 +245,8 @@ export const DocumentCard = memo(function DocumentCard({
             )}
             {isActive && (
               <span className="text-xs text-blue-400/80 font-medium animate-pulse">
-                Analyzing{elapsed ? ` (${elapsed})` : "..."}
+                {t("workspace.analyzing")}
+                {elapsed ? ` (${elapsed})` : "..."}
               </span>
             )}
           </div>
@@ -242,7 +272,7 @@ export const DocumentCard = memo(function DocumentCard({
               ) : (
                 <Sparkles className="w-3 h-3" />
               )}
-              Analyze
+              <span className="hidden @[300px]:inline">{t("workspace.analyze")}</span>
             </Button>
           )}
           {/* Re-process for indexed docs — hover only */}
@@ -255,7 +285,7 @@ export const DocumentCard = memo(function DocumentCard({
                 onReindex(doc.id);
               }}
               className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-              title="Re-analyze"
+              title={t("workspace.reanalyze")}
             >
               <RefreshCw className="w-3.5 h-3.5" />
             </Button>

@@ -63,17 +63,51 @@ server.registerTool(
 );
 
 server.registerTool(
-  "get_document_by_id",
+  "get_document_markdown",
   {
     description:
-      "Fetch the full metadata and processing state of a specific indexed document using its unique `document_id`. Use this when you need to know a document's status, filename, source, or parsing results.",
+      "Retrieve the full structured markdown content of a specific document (parsed by PrismRAG). This includes text content, table representations, and image placeholders.",
     inputSchema: {
-      document_id: z.number().describe("The ID of the document to retrieve."),
+      document_id: z.number().describe("The ID of the document to retrieve markdown for."),
     },
   },
   async ({ document_id }) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/documents/${document_id}/markdown`);
+      return {
+        content: [
+          {
+            type: "text",
+            text: response.data,
+          },
+        ],
+      };
+    } catch (error: unknown) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Failed to fetch document markdown for ${document_id}: ${axiosErrorDetail(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  },
+);
+
+server.registerTool(
+  "get_document_metadata",
+  {
+    description:
+      "Fetch the full metadata and processing state of a specific document using its unique `document_id`. Use this when you need to know a document's status, filename, source, or parsing results (like chunk/image counts).",
+    inputSchema: {
+      document_id: z.number().describe("The ID of the document to retrieve metadata for."),
+    },
+  },
+  async ({ document_id }) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/documents/${document_id}`);
       return {
         content: [
           {
@@ -87,7 +121,41 @@ server.registerTool(
         content: [
           {
             type: "text",
-            text: `Failed to fetch document ${document_id}: ${axiosErrorDetail(error)}`,
+            text: `Failed to fetch document metadata for ${document_id}: ${axiosErrorDetail(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  },
+);
+
+server.registerTool(
+  "list_documents",
+  {
+    description:
+      "List all documents currently stored in a specific knowledge base (workspace). Use this to browse available files and find specific `document_id`s.",
+    inputSchema: {
+      workspace_id: z.number().describe("The ID of the workspace to list documents from."),
+    },
+  },
+  async ({ workspace_id }) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/documents/workspace/${workspace_id}`);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(response.data, null, 2),
+          },
+        ],
+      };
+    } catch (error: unknown) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Failed to list documents for workspace ${workspace_id}: ${axiosErrorDetail(error)}`,
           },
         ],
         isError: true,
@@ -176,6 +244,90 @@ server.registerTool(
           {
             type: "text",
             text: `Failed to fetch chunks for document ${document_id}: ${axiosErrorDetail(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  },
+);
+
+server.registerTool(
+  "get_kg_graph",
+  {
+    description:
+      "Export knowledge graph data (entities and relationships) for a specific workspace. Useful for understanding complex connections between concepts in the knowledge base.",
+    inputSchema: {
+      workspace_id: z.number().describe("The ID of the workspace to get graph data for."),
+      center: z.string().optional().describe("Entity name to center the graph on."),
+      max_depth: z
+        .number()
+        .optional()
+        .describe("Maximum depth of relationships to traverse (default: 3)."),
+      max_nodes: z
+        .number()
+        .optional()
+        .describe("Maximum number of nodes to return (default: 150)."),
+    },
+  },
+  async ({ workspace_id, center, max_depth = 3, max_nodes = 150 }) => {
+    try {
+      const params = new URLSearchParams();
+      if (center) params.append("center", center);
+      params.append("max_depth", String(max_depth));
+      params.append("max_nodes", String(max_nodes));
+
+      const response = await axios.get(
+        `${API_BASE_URL}/rag/graph/${workspace_id}?${params.toString()}`,
+      );
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(response.data, null, 2),
+          },
+        ],
+      };
+    } catch (error: unknown) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Failed to fetch KG graph for workspace ${workspace_id}: ${axiosErrorDetail(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  },
+);
+
+server.registerTool(
+  "get_workspace_stats",
+  {
+    description:
+      "Retrieve high-level statistics for a knowledge base, including document count, chunk count, and image count.",
+    inputSchema: {
+      workspace_id: z.number().describe("The ID of the workspace to get stats for."),
+    },
+  },
+  async ({ workspace_id }) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/rag/stats/${workspace_id}`);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(response.data, null, 2),
+          },
+        ],
+      };
+    } catch (error: unknown) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Failed to fetch stats for workspace ${workspace_id}: ${axiosErrorDetail(error)}`,
           },
         ],
         isError: true,

@@ -61,7 +61,8 @@ CREATE TABLE public.documents (
     table_count integer NOT NULL,
     parser_version character varying(50),
     processing_time_ms integer NOT NULL,
-    custom_metadata json
+    custom_metadata json,
+    relative_path character varying(500)
 );
 
 CREATE TABLE public.document_images (

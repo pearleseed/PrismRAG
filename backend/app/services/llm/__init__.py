@@ -44,7 +44,20 @@ def get_llm_provider() -> LLMProvider:
             model=settings.OLLAMA_MODEL,
         )
 
-    raise ValueError(f"Unknown LLM_PROVIDER: {provider!r}. Supported: gemini, ollama")
+    if provider == "custom":
+        from app.services.llm.custom_llm import create_custom_llm_provider
+
+        custom_provider = create_custom_llm_provider()
+        if custom_provider is None:
+            raise ValueError(
+                "Custom LLM provider is not properly configured. "
+                "Check CUSTOM_LLM_ENDPOINT and other CUSTOM_LLM_* settings."
+            )
+        return custom_provider
+
+    raise ValueError(
+        f"Unknown LLM_PROVIDER: {provider!r}. Supported: gemini, ollama, custom"
+    )
 
 
 @lru_cache
@@ -94,4 +107,5 @@ __all__ = [
     "get_embedding_provider",
     "LLMProvider",
     "EmbeddingProvider",
+    "create_custom_llm_provider",
 ]

@@ -1,16 +1,17 @@
 import { memo } from "react";
 import { Search } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { DocumentStatus } from "@/types";
 
 type FilterStatus = "all" | DocumentStatus;
 
-const TABS: { value: FilterStatus; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "indexed", label: "Indexed" },
-  { value: "parsing", label: "Processing" },
-  { value: "failed", label: "Failed" },
+const TABS: { value: FilterStatus; labelKey: string }[] = [
+  { value: "all", labelKey: "common.all" },
+  { value: "indexed", labelKey: "workspace.status.indexed" },
+  { value: "parsing", labelKey: "workspace.status.processing" },
+  { value: "failed", labelKey: "workspace.status.failed" },
 ];
 
 interface DocumentFiltersProps {
@@ -30,24 +31,24 @@ export const DocumentFilters = memo(function DocumentFilters({
   onStatusChange,
   counts,
 }: DocumentFiltersProps) {
+  const { t } = useTranslation();
   return (
-    <div className="flex items-center gap-3 flex-wrap">
+    <div className="flex items-center gap-2 flex-wrap @container">
       {/* Search */}
-      <div className="relative flex-1 min-w-[180px] max-w-xs">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+      <div className="relative flex-1 min-w-[140px] max-w-full">
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
         <Input
-          placeholder="Filter by name..."
+          placeholder={t("common.filter")}
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="pl-8 h-8 text-sm"
+          className="pl-7 h-7 text-[11px]"
         />
       </div>
 
       {/* Status tabs */}
-      <div className="flex items-center gap-1 bg-muted/40 rounded-lg p-0.5">
+      <div className="flex items-center gap-0.5 bg-muted/40 rounded-lg p-0.5">
         {TABS.map((tab) => {
           const isActive = statusFilter === tab.value;
-          // Merge processing-like statuses into the "Processing" tab
           let count = counts[tab.value] ?? 0;
           if (tab.value === "parsing") {
             count = (counts.parsing ?? 0) + (counts.indexing ?? 0) + (counts.processing ?? 0);
@@ -57,17 +58,22 @@ export const DocumentFilters = memo(function DocumentFilters({
               key={tab.value}
               onClick={() => onStatusChange(tab.value)}
               className={cn(
-                "px-2.5 py-1 text-xs font-medium rounded-md transition-colors",
+                "px-2 py-1 text-[11px] font-medium rounded-md transition-colors whitespace-nowrap flex items-center",
                 isActive
                   ? "bg-card text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              {tab.label}
+              <span className="hidden @[350px]:inline">{t(tab.labelKey)}</span>
+              <span className="@[350px]:hidden">
+                {t(tab.labelKey).length > 6
+                  ? t(tab.labelKey).substring(0, 4) + "."
+                  : t(tab.labelKey)}
+              </span>
               {count > 0 && (
                 <span
                   className={cn(
-                    "ml-1 text-[10px]",
+                    "ml-1 text-[9px]",
                     isActive ? "text-primary" : "text-muted-foreground/60",
                   )}
                 >

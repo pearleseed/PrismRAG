@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
-import { FileText, List, ChevronRight } from "lucide-react";
+import { FileText, List, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import type { Document, ChatSourceChunk } from "@/types";
@@ -74,20 +74,31 @@ const TOCSidebar = memo(function TOCSidebar({
   headings,
   activeId,
   onSelect,
+  onClose,
 }: {
   headings: Heading[];
   activeId: string | null;
   onSelect: (id: string) => void;
+  onClose: () => void;
 }) {
   if (headings.length === 0) return null;
 
   return (
-    <nav className="w-52 shrink-0 border-r overflow-y-auto py-3 px-2 hidden xl:block">
-      <div className="flex items-center gap-1.5 px-2 mb-2">
-        <List className="w-3.5 h-3.5 text-muted-foreground" />
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Contents
-        </span>
+    <nav className="w-56 shrink-0 border-r overflow-y-auto py-3 px-2 flex flex-col bg-muted/10">
+      <div className="flex items-center justify-between gap-1.5 px-2 mb-4">
+        <div className="flex items-center gap-1.5">
+          <List className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-tight">
+            Contents
+          </span>
+        </div>
+        <button
+          onClick={onClose}
+          className="p-1 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground"
+          title="Collapse sidebar"
+        >
+          <PanelLeftClose className="w-3.5 h-3.5" />
+        </button>
       </div>
       <ul className="space-y-0.5">
         {headings.map((h) => (
@@ -95,13 +106,13 @@ const TOCSidebar = memo(function TOCSidebar({
             <button
               onClick={() => onSelect(h.id)}
               className={cn(
-                "w-full text-left text-xs py-1 px-2 rounded-md transition-colors truncate",
-                "hover:bg-muted",
+                "w-full text-left text-[11px] py-1.5 px-2 rounded-md transition-all duration-200 truncate",
+                "hover:bg-muted/80",
                 activeId === h.id
-                  ? "text-primary font-medium bg-primary/10"
-                  : "text-muted-foreground",
+                  ? "text-primary font-semibold bg-primary/10 shadow-sm"
+                  : "text-muted-foreground/80 hover:text-foreground",
               )}
-              style={{ paddingLeft: `${(h.level - 1) * 12 + 8}px` }}
+              style={{ paddingLeft: `${(h.level - 1) * 10 + 8}px` }}
               title={h.text}
             >
               {h.text}
@@ -509,23 +520,30 @@ export const DocumentViewer = memo(function DocumentViewer({
     <div className="flex h-full min-h-0">
       {/* TOC sidebar */}
       {showToc && (
-        <TOCSidebar headings={headings} activeId={activeHeading} onSelect={handleTocSelect} />
+        <TOCSidebar
+          headings={headings}
+          activeId={activeHeading}
+          onSelect={handleTocSelect}
+          onClose={() => setShowToc(false)}
+        />
       )}
 
       {/* Main markdown content */}
       <div ref={contentRef} className="flex-1 min-h-0 overflow-y-auto">
-        {/* TOC toggle (for smaller screens / when TOC hidden) */}
-        {headings.length > 0 && (
+        {/* TOC toggle button (visible when TOC is hidden) */}
+        {!showToc && headings.length > 0 && (
           <button
-            onClick={() => setShowToc(!showToc)}
+            onClick={() => setShowToc(true)}
             className={cn(
-              "sticky top-2 left-2 z-10 p-1.5 rounded-md border bg-background/80 backdrop-blur-sm",
-              "hover:bg-muted transition-colors xl:hidden",
-              "flex items-center gap-1 text-xs text-muted-foreground",
+              "sticky top-2 left-2 z-10 p-1.5 rounded-r-md border border-l-0 bg-background/80 backdrop-blur-sm shadow-sm",
+              "hover:bg-muted transition-all duration-200 group flex items-center gap-1.5",
             )}
+            title="Show table of contents"
           >
-            <List className="w-3.5 h-3.5" />
-            <ChevronRight className={cn("w-3 h-3 transition-transform", showToc && "rotate-90")} />
+            <PanelLeftOpen className="w-4 h-4 text-primary" />
+            <span className="text-[10px] font-bold text-primary uppercase tracking-tighter opacity-0 group-hover:opacity-100 transition-opacity">
+              Contents
+            </span>
           </button>
         )}
 

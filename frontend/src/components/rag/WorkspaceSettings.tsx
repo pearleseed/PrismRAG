@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import { Settings2, X, Save, RotateCcw, Plus, Globe, Tags } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -124,6 +125,7 @@ function TagInput({
 // ---------------------------------------------------------------------------
 
 export function WorkspaceSettings({ workspace, onSave, open, onClose }: WorkspaceSettingsProps) {
+  const { t } = useTranslation();
   const [language, setLanguage] = useState(workspace.kg_language ?? "");
   const [entityTypes, setEntityTypes] = useState<string[]>(workspace.kg_entity_types ?? []);
   const [saving, setSaving] = useState(false);
@@ -145,14 +147,14 @@ export function WorkspaceSettings({ workspace, onSave, open, onClose }: Workspac
         kg_language: language || null,
         kg_entity_types: entityTypes.length > 0 ? entityTypes : null,
       });
-      toast.success("Workspace settings saved");
+      toast.success(t("chat.systemPromptSaved")); // Reusing a similar toast
       onClose();
     } catch {
-      toast.error("Failed to save settings");
+      toast.error(t("workspace.uploadFailed")); // Reusing a similar toast
     } finally {
       setSaving(false);
     }
-  }, [language, entityTypes, onSave, onClose]);
+  }, [language, entityTypes, onSave, onClose, t]);
 
   const handleReset = () => {
     setLanguage("");
@@ -171,7 +173,7 @@ export function WorkspaceSettings({ workspace, onSave, open, onClose }: Workspac
       <div className="flex items-center justify-between px-3 py-2 border-b shrink-0">
         <div className="flex items-center gap-2">
           <Settings2 className="w-4 h-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold">Workspace Settings</h2>
+          <h2 className="text-sm font-semibold">{t("workspace.workspaceSettings")}</h2>
         </div>
         <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7">
           <X className="w-4 h-4" />
@@ -184,7 +186,7 @@ export function WorkspaceSettings({ workspace, onSave, open, onClose }: Workspac
         <div className="space-y-1.5">
           <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <Globe className="w-3.5 h-3.5" />
-            KG Language
+            {t("workspace.kgLanguage")}
           </label>
           <Select
             value={language}
@@ -197,9 +199,7 @@ export function WorkspaceSettings({ workspace, onSave, open, onClose }: Workspac
               </option>
             ))}
           </Select>
-          <p className="text-[10px] text-muted-foreground">
-            Language used for KG entity extraction. Empty = server default.
-          </p>
+          <p className="text-[10px] text-muted-foreground">{t("workspace.kgLanguageDesc")}</p>
         </div>
 
         {/* KG Entity Types */}
@@ -207,7 +207,7 @@ export function WorkspaceSettings({ workspace, onSave, open, onClose }: Workspac
           <div className="flex items-center justify-between">
             <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               <Tags className="w-3.5 h-3.5" />
-              KG Entity Types
+              {t("workspace.kgEntityTypes")}
             </label>
             <Button
               variant="ghost"
@@ -216,26 +216,21 @@ export function WorkspaceSettings({ workspace, onSave, open, onClose }: Workspac
               className="h-6 text-[10px] px-2 text-muted-foreground"
             >
               <Plus className="w-3 h-3 mr-0.5" />
-              Load defaults
+              {t("workspace.loadDefaults")}
             </Button>
           </div>
           <TagInput
             tags={entityTypes}
             onChange={setEntityTypes}
-            placeholder="Organization, Person, Product..."
+            placeholder={t("workspace.entityPlaceholder")}
           />
-          <p className="text-[10px] text-muted-foreground">
-            Entity types for Knowledge Graph extraction. Press Enter or comma to add. Empty = server
-            default.
-          </p>
+          <p className="text-[10px] text-muted-foreground">{t("workspace.kgEntityTypesDesc")}</p>
         </div>
 
         {/* Info box */}
         <div className="rounded-md border border-blue-400/20 bg-blue-400/5 p-2.5">
           <p className="text-[10px] text-muted-foreground leading-relaxed">
-            These settings affect how documents are processed in this workspace. Changes apply to
-            newly analyzed documents — existing documents keep their current KG data. Re-analyze
-            documents to apply new settings.
+            {t("workspace.settingsInfo")}
           </p>
         </div>
       </div>
@@ -244,11 +239,11 @@ export function WorkspaceSettings({ workspace, onSave, open, onClose }: Workspac
       <div className="flex items-center justify-between px-3 py-2 border-t shrink-0">
         <Button variant="ghost" size="sm" onClick={handleReset} className="h-7 text-xs gap-1">
           <RotateCcw className="w-3 h-3" />
-          Reset to defaults
+          {t("workspace.resetToDefaults")}
         </Button>
         <div className="flex items-center gap-1.5">
           <Button variant="ghost" size="sm" onClick={onClose} className="h-7 text-xs">
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             size="sm"
@@ -257,7 +252,7 @@ export function WorkspaceSettings({ workspace, onSave, open, onClose }: Workspac
             className="h-7 text-xs gap-1"
           >
             <Save className="w-3 h-3" />
-            {saving ? "Saving..." : "Save"}
+            {saving ? t("common.saving") : t("common.save")}
           </Button>
         </div>
       </div>

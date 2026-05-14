@@ -34,7 +34,7 @@ export const StatsBar = memo(function StatsBar({ stats, processingCount = 0 }: S
   if (!stats) return null;
 
   return (
-    <div className="flex items-center gap-4 flex-wrap">
+    <div className="flex items-center gap-x-3 gap-y-1.5 flex-wrap">
       <StatItem icon={FileText} label="Documents" value={stats.total_documents} />
       <StatItem icon={Database} label="Indexed" value={stats.indexed_documents} accent />
       <StatItem icon={Database} label="Chunks" value={stats.total_chunks} />

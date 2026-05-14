@@ -9,17 +9,16 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-import logging
-
 from datetime import datetime, timedelta, timezone
-
 from sqlalchemy import text, update
 
 from app.core.config import settings
 from app.core.database import engine, Base
+from app.core.logging_config import setup_logging, get_logger
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Initialize professional logging
+setup_logging(log_level="DEBUG" if settings.DEBUG else "INFO")
+logger = get_logger(__name__)
 
 
 @asynccontextmanager

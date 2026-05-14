@@ -49,14 +49,17 @@ SCRIPTS_DIR = Path(__file__).parent
 
 # ── Step 1: Extract chunks from workspace ────────────────────────────────────
 
+
 def fetch_workspace_documents(workspace_id: int) -> list[dict]:
     """Get list of documents in a workspace via stats + chunks endpoints."""
     print(f"\n[1/4] Fetching documents from workspace {workspace_id}...")
 
     # Get workspace stats to find document count
     stats = requests.get(f"{BASE_URL}/stats/{workspace_id}", timeout=10).json()
-    print(f"  Workspace has {stats['total_documents']} documents, "
-          f"{stats['indexed_documents']} indexed, {stats['total_chunks']} total chunks")
+    print(
+        f"  Workspace has {stats['total_documents']} documents, "
+        f"{stats['indexed_documents']} indexed, {stats['total_chunks']} total chunks"
+    )
 
     # We need to know the document IDs. Query each potential doc.
     # For workspace 11: docs 11 and 12
@@ -75,12 +78,14 @@ def fetch_workspace_documents(workspace_id: int) -> list[dict]:
                     for chunk in data["chunks"]:
                         content = chunk.get("content", "")
                         if content and len(content.strip()) > 20:
-                            all_chunks.append({
-                                "content": content,
-                                "document_id": doc_id,
-                                "chunk_id": chunk.get("chunk_id", ""),
-                                "metadata": chunk.get("metadata", {}),
-                            })
+                            all_chunks.append(
+                                {
+                                    "content": content,
+                                    "document_id": doc_id,
+                                    "chunk_id": chunk.get("chunk_id", ""),
+                                    "metadata": chunk.get("metadata", {}),
+                                }
+                            )
                     print(f"  Doc {doc_id}: {len(data['chunks'])} chunks loaded")
 
             # Stop early once we've found enough docs
@@ -89,7 +94,9 @@ def fetch_workspace_documents(workspace_id: int) -> list[dict]:
         except Exception:
             continue
 
-    print(f"  Total: {len(all_chunks)} usable chunks from {len(doc_ids_found)} documents")
+    print(
+        f"  Total: {len(all_chunks)} usable chunks from {len(doc_ids_found)} documents"
+    )
     return all_chunks
 
 
@@ -106,12 +113,14 @@ def fetch_workspace_chunks_fast(workspace_id: int, doc_ids: list[int]) -> list[d
         for chunk in data.get("chunks", []):
             content = chunk.get("content", "")
             if content and len(content.strip()) > 20:
-                all_chunks.append({
-                    "content": content,
-                    "document_id": doc_id,
-                    "chunk_id": chunk.get("chunk_id", ""),
-                    "metadata": chunk.get("metadata", {}),
-                })
+                all_chunks.append(
+                    {
+                        "content": content,
+                        "document_id": doc_id,
+                        "chunk_id": chunk.get("chunk_id", ""),
+                        "metadata": chunk.get("metadata", {}),
+                    }
+                )
         print(f"  Doc {doc_id}: {len(data.get('chunks', []))} chunks")
 
     print(f"  Total: {len(all_chunks)} usable chunks")
@@ -201,15 +210,21 @@ def generate_testset(
         chunks_text = ""
         for i, c in enumerate(selected_chunks):
             content = c["content"][:800]  # Truncate long chunks
-            chunks_text += f"\n--- Chunk {i} (doc {c.get('document_id', '?')}) ---\n{content}\n"
+            chunks_text += (
+                f"\n--- Chunk {i} (doc {c.get('document_id', '?')}) ---\n{content}\n"
+            )
 
         prompt = GENERATION_PROMPT.format(
             batch_size=batch_size,
             chunks_text=chunks_text,
         )
 
-        print(f"  Batch {batch_num}: generating {batch_size} samples from "
-              f"{len(selected_chunks)} chunks...", end=" ", flush=True)
+        print(
+            f"  Batch {batch_num}: generating {batch_size} samples from "
+            f"{len(selected_chunks)} chunks...",
+            end=" ",
+            flush=True,
+        )
 
         try:
             resp = client.models.generate_content(
@@ -220,8 +235,8 @@ def generate_testset(
 
             # Clean markdown code fences if present
             if text.startswith("```"):
-                text = re.sub(r'^```(?:json)?\s*', '', text)
-                text = re.sub(r'\s*```$', '', text)
+                text = re.sub(r"^```(?:json)?\s*", "", text)
+                text = re.sub(r"\s*```$", "", text)
 
             batch_items = json.loads(text)
 
@@ -235,13 +250,15 @@ def generate_testset(
                     if isinstance(idx, int) and 0 <= idx < len(selected_chunks):
                         ref_contexts.append(selected_chunks[idx]["content"][:500])
 
-                all_samples.append({
-                    "id": f"RAGAS-{len(all_samples)+1:03d}",
-                    "user_input": item["user_input"],
-                    "reference": item["reference"],
-                    "reference_contexts": ref_contexts,
-                    "synthesizer_name": item.get("synthesizer_name", "unknown"),
-                })
+                all_samples.append(
+                    {
+                        "id": f"RAGAS-{len(all_samples) + 1:03d}",
+                        "user_input": item["user_input"],
+                        "reference": item["reference"],
+                        "reference_contexts": ref_contexts,
+                        "synthesizer_name": item.get("synthesizer_name", "unknown"),
+                    }
+                )
 
             print(f"OK ({len(batch_items)} items)")
 
@@ -259,6 +276,7 @@ def generate_testset(
 
 # ── Step 3: Run testset through PrismRAG chat ─────────────────────────────────
 
+
 def run_testset_through_chat(
     workspace_id: int,
     samples: list[dict],
@@ -270,10 +288,10 @@ def run_testset_through_chat(
     for i, sample in enumerate(samples):
         question = sample["user_input"]
         if not question.strip():
-            print(f"  [{i+1}/{len(samples)}] SKIP (empty question)")
+            print(f"  [{i + 1}/{len(samples)}] SKIP (empty question)")
             continue
 
-        print(f"  [{i+1}/{len(samples)}] {question[:60]}...", end=" ", flush=True)
+        print(f"  [{i + 1}/{len(samples)}] {question[:60]}...", end=" ", flush=True)
 
         try:
             start = time.time()
@@ -292,29 +310,34 @@ def run_testset_through_chat(
                 s.get("content_preview", "") for s in retrieved_sources
             ]
 
-            results.append({
-                **sample,
-                "response": answer,
-                "retrieved_contexts_actual": retrieved_contexts,
-                "source_count": len(retrieved_sources),
-                "latency_ms": latency,
-            })
+            results.append(
+                {
+                    **sample,
+                    "response": answer,
+                    "retrieved_contexts_actual": retrieved_contexts,
+                    "source_count": len(retrieved_sources),
+                    "latency_ms": latency,
+                }
+            )
             print(f"OK ({latency:.0f}ms)")
 
         except Exception as e:
             print(f"ERROR: {e}")
-            results.append({
-                **sample,
-                "response": f"ERROR: {e}",
-                "retrieved_contexts_actual": [],
-                "source_count": 0,
-                "latency_ms": 0,
-            })
+            results.append(
+                {
+                    **sample,
+                    "response": f"ERROR: {e}",
+                    "retrieved_contexts_actual": [],
+                    "source_count": 0,
+                    "latency_ms": 0,
+                }
+            )
 
     return results
 
 
 # ── Step 4: Evaluate with RAGAS metrics + rule-based ─────────────────────────
+
 
 def evaluate_with_ragas(
     results: list[dict],
@@ -333,11 +356,11 @@ def evaluate_with_ragas(
         r["metrics"] = {}
 
         # Citation format
-        grouped = re.findall(r'\[\d+[,\s]+\d+\]', answer)
+        grouped = re.findall(r"\[\d+[,\s]+\d+\]", answer)
         r["metrics"]["citation_format"] = 1.0 if not grouped else 0.0
 
         # Token artifacts
-        artifacts = re.findall(r'<unused\d+>:?\s*', answer)
+        artifacts = re.findall(r"<unused\d+>:?\s*", answer)
         r["metrics"]["no_token_artifacts"] = 1.0 if not artifacts else 0.0
 
         # Answer length — factual Q&A can be short, so lower bar (10 words = 1.0)
@@ -351,7 +374,7 @@ def evaluate_with_ragas(
 
         # Context utilization — ratio of cited sources vs retrieved
         # For single-fact answers, citing 1 of 8 sources is fine
-        citations = re.findall(r'\[(\d+)\]', answer)
+        citations = re.findall(r"\[(\d+)\]", answer)
         cited = len(set(citations))
         source_count = r.get("source_count", 0)
         if source_count == 0:
@@ -365,7 +388,9 @@ def evaluate_with_ragas(
 
     # ── RAGAS LLM-based metrics ──
     if gemini_key:
-        print("  Running RAGAS LLM metrics (Faithfulness, AnswerCorrectness, ContextRecall)...")
+        print(
+            "  Running RAGAS LLM metrics (Faithfulness, AnswerCorrectness, ContextRecall)..."
+        )
         os.environ["GOOGLE_API_KEY"] = gemini_key
 
         try:
@@ -379,6 +404,7 @@ def evaluate_with_ragas(
             )
 
             from google import genai
+
             client = genai.Client(api_key=gemini_key)
             evaluator_llm = llm_factory(
                 "gemini-2.0-flash",
@@ -412,14 +438,20 @@ def evaluate_with_ragas(
             metrics = [Faithfulness(llm=evaluator_llm)]
 
             if has_references:
-                metrics.extend([
-                    LLMContextRecall(llm=evaluator_llm),
-                    FactualCorrectness(llm=evaluator_llm),
-                ])
-                print(f"  Metrics: Faithfulness, ContextRecall, FactualCorrectness "
-                      f"({len(eval_samples)} samples with reference)")
+                metrics.extend(
+                    [
+                        LLMContextRecall(llm=evaluator_llm),
+                        FactualCorrectness(llm=evaluator_llm),
+                    ]
+                )
+                print(
+                    f"  Metrics: Faithfulness, ContextRecall, FactualCorrectness "
+                    f"({len(eval_samples)} samples with reference)"
+                )
             else:
-                print(f"  Metrics: Faithfulness only ({len(eval_samples)} samples, no reference)")
+                print(
+                    f"  Metrics: Faithfulness only ({len(eval_samples)} samples, no reference)"
+                )
 
             ragas_result = ragas_evaluate(
                 dataset=eval_dataset,
@@ -436,18 +468,29 @@ def evaluate_with_ragas(
                 if valid_idx < len(df):
                     row = df.iloc[valid_idx]
                     for col in df.columns:
-                        if col not in ("user_input", "response", "retrieved_contexts", "reference"):
+                        if col not in (
+                            "user_input",
+                            "response",
+                            "retrieved_contexts",
+                            "reference",
+                        ):
                             val = row[col]
-                            if isinstance(val, (int, float)) and not (val != val):  # not NaN
+                            if isinstance(val, (int, float)) and not (
+                                val != val
+                            ):  # not NaN
                                 r["metrics"][col] = float(val)
                     valid_idx += 1
 
             print(f"  RAGAS evaluation complete. Aggregate scores:")
             try:
                 # Try dict-like access first
-                scores_dict = ragas_result.scores if hasattr(ragas_result, 'scores') else {}
-                if not scores_dict and hasattr(ragas_result, 'to_pandas'):
-                    agg = ragas_result.to_pandas().select_dtypes(include='number').mean()
+                scores_dict = (
+                    ragas_result.scores if hasattr(ragas_result, "scores") else {}
+                )
+                if not scores_dict and hasattr(ragas_result, "to_pandas"):
+                    agg = (
+                        ragas_result.to_pandas().select_dtypes(include="number").mean()
+                    )
                     scores_dict = agg.to_dict()
                 for metric_name, score in scores_dict.items():
                     if isinstance(score, (int, float)):
@@ -458,6 +501,7 @@ def evaluate_with_ragas(
         except Exception as e:
             print(f"  WARNING: RAGAS evaluation failed: {e}")
             import traceback
+
             traceback.print_exc()
     else:
         print("  Skipping RAGAS LLM metrics (no Gemini key). Rule-based only.")
@@ -466,6 +510,7 @@ def evaluate_with_ragas(
 
 
 # ── Output formatting ────────────────────────────────────────────────────────
+
 
 def print_evaluation_report(results: list[dict]):
     """Print formatted evaluation report."""
@@ -479,10 +524,16 @@ def print_evaluation_report(results: list[dict]):
         avg_score = sum(metrics.values()) / len(metrics) if metrics else 0
         icon = "✓" if avg_score >= 0.7 else "~" if avg_score >= 0.5 else "✗"
 
-        print(f"\n{icon} [{r['id']}] score={avg_score:.2f} | {r.get('latency_ms', 0):.0f}ms | "
-              f"{r.get('source_count', 0)} sources | synth={r.get('synthesizer_name', '?')}")
+        print(
+            f"\n{icon} [{r['id']}] score={avg_score:.2f} | {r.get('latency_ms', 0):.0f}ms | "
+            f"{r.get('source_count', 0)} sources | synth={r.get('synthesizer_name', '?')}"
+        )
         print(f"  Q: {r['user_input'][:80]}")
-        print(f"  A: {r['response'][:80]}..." if len(r.get('response', '')) > 80 else f"  A: {r.get('response', '')}")
+        print(
+            f"  A: {r['response'][:80]}..."
+            if len(r.get("response", "")) > 80
+            else f"  A: {r.get('response', '')}"
+        )
         if r.get("reference"):
             print(f"  Ref: {r['reference'][:80]}...")
 
@@ -548,8 +599,10 @@ def print_evaluation_report(results: list[dict]):
         total = len(overall_scores)
         avg_latency = sum(r.get("latency_ms", 0) for r in results) / len(results)
 
-        print(f"OVERALL SCORE: {avg_overall:.3f} | PASS: {pass_count}/{total} | "
-              f"AVG LATENCY: {avg_latency:.0f}ms")
+        print(
+            f"OVERALL SCORE: {avg_overall:.3f} | PASS: {pass_count}/{total} | "
+            f"AVG LATENCY: {avg_latency:.0f}ms"
+        )
         print("=" * 120)
 
         if avg_overall >= 0.85:
@@ -566,6 +619,7 @@ def print_evaluation_report(results: list[dict]):
 
 
 # ── CLI ──────────────────────────────────────────────────────────────────────
+
 
 def cmd_generate(args):
     """Generate synthetic testset and save to JSON."""
@@ -589,7 +643,9 @@ def cmd_generate(args):
     samples = generate_testset(chunks, args.size, gemini_key)
 
     # Save
-    output_path = Path(args.output) if args.output else SCRIPTS_DIR / "ragas_testset.json"
+    output_path = (
+        Path(args.output) if args.output else SCRIPTS_DIR / "ragas_testset.json"
+    )
     output_path.write_text(json.dumps(samples, indent=2, ensure_ascii=False))
     print(f"\nTestset saved to: {output_path}")
     print(f"  Total samples: {len(samples)}")
@@ -597,7 +653,9 @@ def cmd_generate(args):
     # Show distribution
     synth_counts = {}
     for s in samples:
-        synth_counts[s.get("synthesizer_name", "?")] = synth_counts.get(s.get("synthesizer_name", "?"), 0) + 1
+        synth_counts[s.get("synthesizer_name", "?")] = (
+            synth_counts.get(s.get("synthesizer_name", "?"), 0) + 1
+        )
     print(f"  Distribution:")
     for synth, count in sorted(synth_counts.items()):
         print(f"    {synth}: {count}")
@@ -627,7 +685,9 @@ def cmd_evaluate(args):
 
     # Save results
     output_path = SCRIPTS_DIR / "ragas_eval_results.json"
-    output_path.write_text(json.dumps(results, indent=2, ensure_ascii=False, default=str))
+    output_path.write_text(
+        json.dumps(results, indent=2, ensure_ascii=False, default=str)
+    )
     print(f"\nResults saved to: {output_path}")
 
     return results
@@ -670,7 +730,9 @@ def cmd_all(args):
 
     # Save results
     output_path = SCRIPTS_DIR / "ragas_eval_results.json"
-    output_path.write_text(json.dumps(results, indent=2, ensure_ascii=False, default=str))
+    output_path.write_text(
+        json.dumps(results, indent=2, ensure_ascii=False, default=str)
+    )
     print(f"\nResults saved to: {output_path}")
 
     return results
@@ -686,19 +748,31 @@ def main():
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--workspace", type=int, default=11, help="Workspace ID")
     common.add_argument("--gemini-key", type=str, help="Gemini API key")
-    common.add_argument("--doc-ids", type=str, help="Comma-separated doc IDs (e.g., '11,12')")
+    common.add_argument(
+        "--doc-ids", type=str, help="Comma-separated doc IDs (e.g., '11,12')"
+    )
 
     # Generate
-    gen_parser = subparsers.add_parser("generate", parents=[common], help="Generate synthetic testset")
-    gen_parser.add_argument("--size", type=int, default=50, help="Number of Q&A pairs to generate")
+    gen_parser = subparsers.add_parser(
+        "generate", parents=[common], help="Generate synthetic testset"
+    )
+    gen_parser.add_argument(
+        "--size", type=int, default=50, help="Number of Q&A pairs to generate"
+    )
     gen_parser.add_argument("--output", type=str, help="Output file path")
 
     # Evaluate
-    eval_parser = subparsers.add_parser("evaluate", parents=[common], help="Evaluate existing testset")
-    eval_parser.add_argument("--testset", type=str, required=True, help="Path to testset JSON")
+    eval_parser = subparsers.add_parser(
+        "evaluate", parents=[common], help="Evaluate existing testset"
+    )
+    eval_parser.add_argument(
+        "--testset", type=str, required=True, help="Path to testset JSON"
+    )
 
     # All-in-one
-    all_parser = subparsers.add_parser("all", parents=[common], help="Generate + evaluate")
+    all_parser = subparsers.add_parser(
+        "all", parents=[common], help="Generate + evaluate"
+    )
     all_parser.add_argument("--size", type=int, default=50, help="Number of Q&A pairs")
 
     args = parser.parse_args()
