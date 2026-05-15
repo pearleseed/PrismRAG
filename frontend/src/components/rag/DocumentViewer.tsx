@@ -264,76 +264,73 @@ export const DocumentViewer = memo(function DocumentViewer({
   // ---- Stable ReactMarkdown components (prevents DOM recreation on re-render) ----
   // Without memoization, inline arrow functions create new references each render,
   // causing React to unmount/remount all heading elements — destroying highlight classes.
-  const mdComponents = useMemo<import("react-markdown").Components>(
-    () => {
-      const createHeading = (Tag: "h1" | "h2" | "h3" | "h4" | "h5" | "h6") => {
-        // oxlint-disable-next-line typescript/no-explicit-any
-        return ({ children, ...props }: any) => {
-          const text = getHeadingText(children);
-          const baseId = generateHeadingId(text);
-          const count = headingCountsRef.current.get(baseId) || 0;
-          const id = count === 0 ? baseId : `${baseId}-${count}`;
-          headingCountsRef.current.set(baseId, count + 1);
-          return (
-            <Tag id={id} {...props}>
-              {children}
-            </Tag>
-          );
-        };
+  const mdComponents = useMemo<import("react-markdown").Components>(() => {
+    const createHeading = (Tag: "h1" | "h2" | "h3" | "h4" | "h5" | "h6") => {
+      // oxlint-disable-next-line typescript/no-explicit-any
+      return ({ children, ...props }: any) => {
+        const text = getHeadingText(children);
+        const baseId = generateHeadingId(text);
+        const count = headingCountsRef.current.get(baseId) || 0;
+        const id = count === 0 ? baseId : `${baseId}-${count}`;
+        headingCountsRef.current.set(baseId, count + 1);
+        return (
+          <Tag id={id} {...props}>
+            {children}
+          </Tag>
+        );
       };
+    };
 
-      return {
-        h1: createHeading("h1"),
-        h2: createHeading("h2"),
-        h3: createHeading("h3"),
-        h4: createHeading("h4"),
-        h5: createHeading("h5"),
-        h6: createHeading("h6"),
-        hr: () => {
-          pageCounterRef.current += 1;
-          return <PageDivider pageNo={pageCounterRef.current} />;
-        },
-        p: ({ children, node, ...props }) => {
-          const hasImage =
-            node !== undefined &&
-            node.type === "element" &&
-            node.children.some((child) => child.type === "element" && child.tagName === "img");
-          if (hasImage)
-            return (
-              <div className="mb-3 leading-relaxed text-foreground/80" {...props}>
-                {children}
-              </div>
-            );
-          return <p {...props}>{children}</p>;
-        },
-        img: ({ src, alt, ...props }) => (
-          <figure className="my-4">
-            <img
-              src={src}
-              alt={alt || ""}
-              loading="lazy"
-              className="rounded-lg max-w-full mx-auto border border-border/30"
-              style={{ minHeight: 120, objectFit: "contain", background: "var(--muted)" }}
-              onLoad={(e) => {
-                (e.target as HTMLImageElement).style.minHeight = "auto";
-                (e.target as HTMLImageElement).style.background = "none";
-              }}
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-              {...props}
-            />
-            {alt && (
-              <figcaption className="text-xs text-muted-foreground text-center mt-1.5 italic">
-                {alt}
-              </figcaption>
-            )}
-          </figure>
-        ),
-      };
-    },
-    [],
-  );
+    return {
+      h1: createHeading("h1"),
+      h2: createHeading("h2"),
+      h3: createHeading("h3"),
+      h4: createHeading("h4"),
+      h5: createHeading("h5"),
+      h6: createHeading("h6"),
+      hr: () => {
+        pageCounterRef.current += 1;
+        return <PageDivider pageNo={pageCounterRef.current} />;
+      },
+      p: ({ children, node, ...props }) => {
+        const hasImage =
+          node !== undefined &&
+          node.type === "element" &&
+          node.children.some((child) => child.type === "element" && child.tagName === "img");
+        if (hasImage)
+          return (
+            <div className="mb-3 leading-relaxed text-foreground/80" {...props}>
+              {children}
+            </div>
+          );
+        return <p {...props}>{children}</p>;
+      },
+      img: ({ src, alt, ...props }) => (
+        <figure className="my-4">
+          <img
+            src={src}
+            alt={alt || ""}
+            loading="lazy"
+            className="rounded-lg max-w-full mx-auto border border-border/30"
+            style={{ minHeight: 120, objectFit: "contain", background: "var(--muted)" }}
+            onLoad={(e) => {
+              (e.target as HTMLImageElement).style.minHeight = "auto";
+              (e.target as HTMLImageElement).style.background = "none";
+            }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
+            {...props}
+          />
+          {alt && (
+            <figcaption className="text-xs text-muted-foreground text-center mt-1.5 italic">
+              {alt}
+            </figcaption>
+          )}
+        </figure>
+      ),
+    };
+  }, []);
 
   // Stable plugin arrays
   const remarkPlugins = useMemo(() => [remarkGfm, remarkMath], []);

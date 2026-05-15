@@ -27,15 +27,12 @@ export function useClearChatHistory(workspaceId: string, conversationId?: number
       return api.delete(url);
     },
     onSuccess: () => {
-      queryClient.setQueryData<ChatHistoryResponse>(
-        ["chat-history", workspaceId, conversationId],
-        {
-          workspace_id: Number(workspaceId),
-          conversation_id: conversationId ?? null,
-          messages: [],
-          total: 0,
-        }
-      );
+      queryClient.setQueryData<ChatHistoryResponse>(["chat-history", workspaceId, conversationId], {
+        workspace_id: Number(workspaceId),
+        conversation_id: conversationId ?? null,
+        messages: [],
+        total: 0,
+      });
     },
   });
 }

@@ -1493,7 +1493,6 @@ export const ChatPanel = memo(function ChatPanel({
     [workspaceId],
   );
 
-
   // Sync thinking toggle default from server (once per mount)
   useEffect(() => {
     if (capabilities && !thinkingDefaultSynced) {
@@ -1943,66 +1942,66 @@ export const ChatPanel = memo(function ChatPanel({
                     ) : (
                       <>
                         {conversations?.map((conv) => (
-                        <div
-                          key={conv.id}
-                          onClick={() => handleSelectConversation(conv.id)}
-                          className={cn(
-                            "group relative flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition-all cursor-pointer border border-transparent",
-                            selectedConversationId === conv.id
-                              ? "bg-primary/8 text-primary font-bold border-primary/10 shadow-sm"
-                              : "text-muted-foreground/80 hover:bg-muted/50 hover:text-foreground",
-                          )}
-                        >
-                          <MessageSquare
+                          <div
+                            key={conv.id}
+                            onClick={() => handleSelectConversation(conv.id)}
                             className={cn(
-                              "w-4 h-4 shrink-0 transition-transform group-hover:scale-110",
+                              "group relative flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition-all cursor-pointer border border-transparent",
                               selectedConversationId === conv.id
-                                ? "text-primary"
-                                : "text-muted-foreground/40",
+                                ? "bg-primary/8 text-primary font-bold border-primary/10 shadow-sm"
+                                : "text-muted-foreground/80 hover:bg-muted/50 hover:text-foreground",
                             )}
-                          />
-                          {editingId === conv.id ? (
-                            <input
-                              autoFocus
-                              className="flex-1 bg-transparent outline-none border-b border-primary/30 text-xs py-0.5"
-                              value={editingTitle}
-                              onChange={(e) => setEditingTitle(e.target.value)}
-                              onBlur={() => handleRename(conv.id)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") handleRename(conv.id);
-                                if (e.key === "Escape") setEditingId(null);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
+                          >
+                            <MessageSquare
+                              className={cn(
+                                "w-4 h-4 shrink-0 transition-transform group-hover:scale-110",
+                                selectedConversationId === conv.id
+                                  ? "text-primary"
+                                  : "text-muted-foreground/40",
+                              )}
                             />
-                          ) : (
-                            <span className="flex-1 truncate pr-8 text-xs font-medium tracking-tight">
-                              {conv.title}
-                            </span>
-                          )}
-
-                          <div className="absolute right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                            {conv.id !== 0 && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingId(conv.id);
-                                  setEditingTitle(conv.title);
+                            {editingId === conv.id ? (
+                              <input
+                                autoFocus
+                                className="flex-1 bg-transparent outline-none border-b border-primary/30 text-xs py-0.5"
+                                value={editingTitle}
+                                onChange={(e) => setEditingTitle(e.target.value)}
+                                onBlur={() => handleRename(conv.id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") handleRename(conv.id);
+                                  if (e.key === "Escape") setEditingId(null);
                                 }}
-                                className="p-1.5 rounded-lg hover:bg-primary/10 hover:text-primary transition-all active:scale-90"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            ) : (
+                              <span className="flex-1 truncate pr-8 text-xs font-medium tracking-tight">
+                                {conv.title}
+                              </span>
                             )}
-                            {conv.id !== 0 && (
-                              <button
-                                onClick={(e) => handleDeleteConversation(e, conv.id)}
-                                className="p-1.5 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-all active:scale-90"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
+
+                            <div className="absolute right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                              {conv.id !== 0 && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingId(conv.id);
+                                    setEditingTitle(conv.title);
+                                  }}
+                                  className="p-1.5 rounded-lg hover:bg-primary/10 hover:text-primary transition-all active:scale-90"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {conv.id !== 0 && (
+                                <button
+                                  onClick={(e) => handleDeleteConversation(e, conv.id)}
+                                  className="p-1.5 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-all active:scale-90"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </div>
-                        </div>
                         ))}
                       </>
                     )}
@@ -2041,349 +2040,349 @@ export const ChatPanel = memo(function ChatPanel({
                     </div>
                   </div>
                 </div>
-              <div className="flex items-center gap-1.5">
-                {/* Thinking toggle — only visible when model supports thinking */}
-                {thinkingSupported && (
+                <div className="flex items-center gap-1.5">
+                  {/* Thinking toggle — only visible when model supports thinking */}
+                  {thinkingSupported && (
+                    <button
+                      onClick={() => setEnableThinking((prev) => !prev)}
+                      className={cn(
+                        "flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold transition-all",
+                        enableThinking
+                          ? "text-violet-500 bg-violet-500/10 hover:bg-violet-500/20 shadow-sm shadow-violet-500/10"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                      )}
+                      title={enableThinking ? t("chat.thinkingOn") : t("chat.thinkingOff")}
+                    >
+                      <Brain className="w-3.5 h-3.5" />
+                      <span className="uppercase tracking-tight">{t("chat.think")}</span>
+                    </button>
+                  )}
+                  {/* Force search toggle */}
                   <button
-                    onClick={() => setEnableThinking((prev) => !prev)}
+                    onClick={() => setForceSearch((prev) => !prev)}
                     className={cn(
                       "flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold transition-all",
-                      enableThinking
-                        ? "text-violet-500 bg-violet-500/10 hover:bg-violet-500/20 shadow-sm shadow-violet-500/10"
+                      forceSearch
+                        ? "text-amber-500 bg-amber-500/10 hover:bg-amber-500/20 shadow-sm shadow-amber-500/10"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground",
                     )}
-                    title={enableThinking ? t("chat.thinkingOn") : t("chat.thinkingOff")}
+                    title={forceSearch ? t("chat.forceSearchOn") : t("chat.forceSearchOff")}
                   >
-                    <Brain className="w-3.5 h-3.5" />
-                    <span className="uppercase tracking-tight">{t("chat.think")}</span>
+                    <DatabaseZap className="w-3.5 h-3.5" />
+                    <span className="uppercase tracking-tight">{t("chat.search")}</span>
                   </button>
-                )}
-                {/* Force search toggle */}
-                <button
-                  onClick={() => setForceSearch((prev) => !prev)}
-                  className={cn(
-                    "flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold transition-all",
-                    forceSearch
-                      ? "text-amber-500 bg-amber-500/10 hover:bg-amber-500/20 shadow-sm shadow-amber-500/10"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  )}
-                  title={forceSearch ? t("chat.forceSearchOn") : t("chat.forceSearchOff")}
-                >
-                  <DatabaseZap className="w-3.5 h-3.5" />
-                  <span className="uppercase tracking-tight">{t("chat.search")}</span>
-                </button>
-                <div className="h-4 w-px bg-border mx-1" />
-                {/* System prompt settings */}
-                <button
-                  onClick={() => setShowPromptEditor((p) => !p)}
-                  className={cn(
-                    "p-1.5 rounded-lg transition-all",
-                    showPromptEditor
-                      ? "text-blue-500 bg-blue-500/10 hover:bg-blue-500/20"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  )}
-                  title={t("chat.systemPromptSettings")}
-                >
-                  <Settings className="w-4 h-4" />
-                </button>
-                {messages.length > 0 && (
+                  <div className="h-4 w-px bg-border mx-1" />
+                  {/* System prompt settings */}
                   <button
-                    onClick={handleClear}
-                    className="p-1.5 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-all text-muted-foreground"
-                    title={t("chat.clearChat")}
+                    onClick={() => setShowPromptEditor((p) => !p)}
+                    className={cn(
+                      "p-1.5 rounded-lg transition-all",
+                      showPromptEditor
+                        ? "text-blue-500 bg-blue-500/10 hover:bg-blue-500/20"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                    title={t("chat.systemPromptSettings")}
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Settings className="w-4 h-4" />
                   </button>
-                )}
-                {debugMode && (
-                  <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-500 text-white font-bold tracking-widest shadow-sm">
-                    DEBUG
-                  </span>
-                )}
+                  {messages.length > 0 && (
+                    <button
+                      onClick={handleClear}
+                      className="p-1.5 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-all text-muted-foreground"
+                      title={t("chat.clearChat")}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                  {debugMode && (
+                    <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-500 text-white font-bold tracking-widest shadow-sm">
+                      DEBUG
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
 
-            {/* System Prompt Editor */}
-            <AnimatePresence>
-              {showPromptEditor && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="shrink-0 overflow-visible border-b relative z-40"
-                >
-                  <div className="px-3 py-2 space-y-2 bg-muted/20">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-medium text-muted-foreground">
-                        {t("chat.systemPrompt")}
-                      </span>
-                      <span
+              {/* System Prompt Editor */}
+              <AnimatePresence>
+                {showPromptEditor && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="shrink-0 overflow-visible border-b relative z-40"
+                  >
+                    <div className="px-3 py-2 space-y-2 bg-muted/20">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-muted-foreground">
+                          {t("chat.systemPrompt")}
+                        </span>
+                        <span
+                          className={cn(
+                            "text-[9px] px-1.5 py-0.5 rounded-full font-medium",
+                            isCustom
+                              ? "bg-blue-500/15 text-blue-600 dark:text-blue-400"
+                              : "bg-muted text-muted-foreground/50",
+                          )}
+                        >
+                          {isCustom ? "Custom" : "Default"}
+                        </span>
+                      </div>
+                      <textarea
+                        value={promptDraft}
+                        onChange={(e) => setPromptDraft(e.target.value)}
+                        placeholder={t("chat.systemPromptPlaceholder")}
+                        rows={8}
                         className={cn(
-                          "text-[9px] px-1.5 py-0.5 rounded-full font-medium",
-                          isCustom
-                            ? "bg-blue-500/15 text-blue-600 dark:text-blue-400"
-                            : "bg-muted text-muted-foreground/50",
+                          "w-full resize-none rounded-md border border-input bg-background px-2.5 py-2 text-xs",
+                          "placeholder:text-muted-foreground/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                          "leading-relaxed",
                         )}
-                      >
-                        {isCustom ? "Custom" : "Default"}
-                      </span>
-                    </div>
-                    <textarea
-                      value={promptDraft}
-                      onChange={(e) => setPromptDraft(e.target.value)}
-                      placeholder={t("chat.systemPromptPlaceholder")}
-                      rows={8}
-                      className={cn(
-                        "w-full resize-none rounded-md border border-input bg-background px-2.5 py-2 text-xs",
-                        "placeholder:text-muted-foreground/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                        "leading-relaxed",
-                      )}
-                    />
-                    <div className="flex items-center gap-1.5">
-                      <div className="relative group/cite">
-                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 cursor-help transition-all hover:bg-blue-500/20 hover:border-blue-500/30 shadow-sm shadow-blue-500/5">
-                          <ShieldCheck className="w-3.5 h-3.5" />
-                          <span className="text-[10px] font-bold uppercase tracking-tight">
-                            {t("chat.hardRules")}
-                          </span>
-                        </div>
+                      />
+                      <div className="flex items-center gap-1.5">
+                        <div className="relative group/cite">
+                          <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 cursor-help transition-all hover:bg-blue-500/20 hover:border-blue-500/30 shadow-sm shadow-blue-500/5">
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            <span className="text-[10px] font-bold uppercase tracking-tight">
+                              {t("chat.hardRules")}
+                            </span>
+                          </div>
 
-                        {/* Tooltip on hover — below icon */}
-                        <div className="absolute left-0 top-full mt-2.5 z-100 w-[380px] rounded-xl border border-blue-500/20 bg-background/95 backdrop-blur-xl shadow-2xl opacity-0 pointer-events-none group-hover/cite:opacity-100 group-hover/cite:pointer-events-auto transition-all duration-300 translate-y-1 group-hover/cite:translate-y-0">
-                          <div className="p-4 relative overflow-hidden">
-                            {/* Background accent */}
+                          {/* Tooltip on hover — below icon */}
+                          <div className="absolute left-0 top-full mt-2.5 z-100 w-[380px] rounded-xl border border-blue-500/20 bg-background/95 backdrop-blur-xl shadow-2xl opacity-0 pointer-events-none group-hover/cite:opacity-100 group-hover/cite:pointer-events-auto transition-all duration-300 translate-y-1 group-hover/cite:translate-y-0">
+                            <div className="p-4 relative overflow-hidden">
+                              {/* Background accent */}
 
-                            <div className="flex items-center gap-2 mb-3">
-                              <div className="p-1.5 rounded-lg bg-blue-500/10">
-                                <FileText className="w-4 h-4 text-blue-500" />
-                              </div>
-                              <div>
-                                <h4 className="text-xs font-bold text-foreground">
-                                  AI Governance Rules
-                                </h4>
-                                <p className="text-[9px] text-muted-foreground font-medium">
-                                  Strictly enforced for all workspace responses
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-3">
-                                <div>
-                                  <h5 className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                                    <Languages className="w-3 h-3" /> Language
-                                  </h5>
-                                  <ul className="space-y-1.5">
-                                    <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
-                                      <span className="text-blue-500 shrink-0">•</span>
-                                      Same language as question
-                                    </li>
-                                  </ul>
+                              <div className="flex items-center gap-2 mb-3">
+                                <div className="p-1.5 rounded-lg bg-blue-500/10">
+                                  <FileText className="w-4 h-4 text-blue-500" />
                                 </div>
                                 <div>
-                                  <h5 className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                                    <Hash className="w-3 h-3" /> Citation
-                                  </h5>
-                                  <ul className="space-y-1.5">
-                                    <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
-                                      <span className="text-blue-500 shrink-0">•</span>
-                                      Cite EVERY claim: [id]
-                                    </li>
-                                    <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
-                                      <span className="text-blue-500 shrink-0">•</span>
-                                      Images: [IMG-id]
-                                    </li>
-                                    <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
-                                      <span className="text-blue-500 shrink-0">•</span>
-                                      Max 3 citations/sentence
-                                    </li>
-                                  </ul>
+                                  <h4 className="text-xs font-bold text-foreground">
+                                    AI Governance Rules
+                                  </h4>
+                                  <p className="text-[9px] text-muted-foreground font-medium">
+                                    Strictly enforced for all workspace responses
+                                  </p>
                                 </div>
                               </div>
-                              <div className="space-y-3">
-                                <div>
-                                  <h5 className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                                    <Layout className="w-3 h-3" /> Formatting
-                                  </h5>
-                                  <ul className="space-y-1.5">
-                                    <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
-                                      <span className="text-blue-500 shrink-0">•</span>
-                                      Start with direct summary
-                                    </li>
-                                    <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
-                                      <span className="text-blue-500 shrink-0">•</span>
-                                      Use tables & flat lists
-                                    </li>
-                                    <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
-                                      <span className="text-blue-500 shrink-0">•</span>
-                                      LaTeX for math symbols
-                                    </li>
-                                  </ul>
+
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-3">
+                                  <div>
+                                    <h5 className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                                      <Languages className="w-3 h-3" /> Language
+                                    </h5>
+                                    <ul className="space-y-1.5">
+                                      <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
+                                        <span className="text-blue-500 shrink-0">•</span>
+                                        Same language as question
+                                      </li>
+                                    </ul>
+                                  </div>
+                                  <div>
+                                    <h5 className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                                      <Hash className="w-3 h-3" /> Citation
+                                    </h5>
+                                    <ul className="space-y-1.5">
+                                      <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
+                                        <span className="text-blue-500 shrink-0">•</span>
+                                        Cite EVERY claim: [id]
+                                      </li>
+                                      <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
+                                        <span className="text-blue-500 shrink-0">•</span>
+                                        Images: [IMG-id]
+                                      </li>
+                                      <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
+                                        <span className="text-blue-500 shrink-0">•</span>
+                                        Max 3 citations/sentence
+                                      </li>
+                                    </ul>
+                                  </div>
                                 </div>
-                                <div>
-                                  <h5 className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                                    <Ban className="w-3 h-3" /> Restrictions
-                                  </h5>
-                                  <ul className="space-y-1.5">
-                                    <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
-                                      <span className="text-blue-500 shrink-0">•</span>
-                                      No hedging or emojis
-                                    </li>
-                                    <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
-                                      <span className="text-blue-500 shrink-0">•</span>
-                                      No trailing questions
-                                    </li>
-                                  </ul>
+                                <div className="space-y-3">
+                                  <div>
+                                    <h5 className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                                      <Layout className="w-3 h-3" /> Formatting
+                                    </h5>
+                                    <ul className="space-y-1.5">
+                                      <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
+                                        <span className="text-blue-500 shrink-0">•</span>
+                                        Start with direct summary
+                                      </li>
+                                      <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
+                                        <span className="text-blue-500 shrink-0">•</span>
+                                        Use tables & flat lists
+                                      </li>
+                                      <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
+                                        <span className="text-blue-500 shrink-0">•</span>
+                                        LaTeX for math symbols
+                                      </li>
+                                    </ul>
+                                  </div>
+                                  <div>
+                                    <h5 className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                                      <Ban className="w-3 h-3" /> Restrictions
+                                    </h5>
+                                    <ul className="space-y-1.5">
+                                      <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
+                                        <span className="text-blue-500 shrink-0">•</span>
+                                        No hedging or emojis
+                                      </li>
+                                      <li className="text-[10px] text-foreground/80 leading-relaxed flex gap-1.5">
+                                        <span className="text-blue-500 shrink-0">•</span>
+                                        No trailing questions
+                                      </li>
+                                    </ul>
+                                  </div>
                                 </div>
                               </div>
                             </div>
                           </div>
                         </div>
                       </div>
+                      <div className="flex items-center gap-1.5 justify-end">
+                        <button
+                          onClick={handleResetPrompt}
+                          disabled={!isCustom && !promptIsDirty}
+                          className={cn(
+                            "flex items-center gap-1 px-2 py-1 rounded text-[10px] transition-colors",
+                            isCustom || promptIsDirty
+                              ? "text-muted-foreground hover:bg-muted hover:text-foreground"
+                              : "text-muted-foreground/30 cursor-not-allowed",
+                          )}
+                          title={t("chat.resetPrompt")}
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          {t("common.reset")}
+                        </button>
+                        <button
+                          onClick={handleSavePrompt}
+                          disabled={!promptIsDirty || updateWorkspaceMutation.isPending}
+                          className={cn(
+                            "flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-medium transition-colors",
+                            promptIsDirty && !updateWorkspaceMutation.isPending
+                              ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                              : "bg-muted text-muted-foreground/50 cursor-not-allowed",
+                          )}
+                        >
+                          {updateWorkspaceMutation.isPending ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Save className="w-3 h-3" />
+                          )}
+                          {t("common.save")}
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5 justify-end">
-                      <button
-                        onClick={handleResetPrompt}
-                        disabled={!isCustom && !promptIsDirty}
-                        className={cn(
-                          "flex items-center gap-1 px-2 py-1 rounded text-[10px] transition-colors",
-                          isCustom || promptIsDirty
-                            ? "text-muted-foreground hover:bg-muted hover:text-foreground"
-                            : "text-muted-foreground/30 cursor-not-allowed",
-                        )}
-                        title={t("chat.resetPrompt")}
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        {t("common.reset")}
-                      </button>
-                      <button
-                        onClick={handleSavePrompt}
-                        disabled={!promptIsDirty || updateWorkspaceMutation.isPending}
-                        className={cn(
-                          "flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-medium transition-colors",
-                          promptIsDirty && !updateWorkspaceMutation.isPending
-                            ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                            : "bg-muted text-muted-foreground/50 cursor-not-allowed",
-                        )}
-                      >
-                        {updateWorkspaceMutation.isPending ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <Save className="w-3 h-3" />
-                        )}
-                        {t("common.save")}
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-            {/* Messages area */}
-            {messages.length === 0 ? (
-              <SuggestionChips onSelect={handleSend} />
-            ) : (
-              <div
-                ref={scrollContainerRef}
-                className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-3 relative"
-              >
-                <AnimatePresence>
-                  {messages.map((msg) => (
-                    <div key={msg.id} data-message-id={msg.id}>
-                      <MessageBubble message={msg} />
-                    </div>
-                  ))}
-                </AnimatePresence>
-                {/* ThinkingTimeline + TypingIndicator now rendered inside MessageBubble */}
-                {/* Bottom spacer = container height, enables user-message scroll-to-top */}
-                <div ref={spacerRef} aria-hidden />
-              </div>
-            )}
-
-            {/* Input area */}
-            <div className="shrink-0 px-4 pb-4 pt-0 border-t bg-background/80 backdrop-blur-md relative group/input flex flex-col">
-              {/* Internal Resize Handle */}
-              <div
-                className="w-full h-1.5 cursor-ns-resize flex items-center justify-center group/handle py-2"
-                onMouseDown={(e) => {
-                  const startY = e.clientY;
-                  const startHeight = inputRef.current?.offsetHeight || 0;
-                  const onMouseMove = (moveEvent: MouseEvent) => {
-                    if (inputRef.current) {
-                      const delta = startY - moveEvent.clientY;
-                      const newHeight = Math.max(36, Math.min(600, startHeight + delta));
-                      inputRef.current.style.height = `${newHeight}px`;
-                    }
-                  };
-                  const onMouseUp = () => {
-                    window.removeEventListener("mousemove", onMouseMove);
-                    window.removeEventListener("mouseup", onMouseUp);
-                  };
-                  window.addEventListener("mousemove", onMouseMove);
-                  window.addEventListener("mouseup", onMouseUp);
-                }}
-              >
-                <div className="w-8 h-1 rounded-full bg-muted-foreground/10 group-hover/handle:bg-primary/30 transition-all group-hover/handle:w-12" />
-              </div>
-
-              <div className="flex items-end gap-2 relative">
-                <textarea
-                  ref={inputRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={t("chat.inputPlaceholder")}
-                  rows={1}
-                  className={cn(
-                    "flex-1 resize-none rounded-2xl border border-input bg-muted/30 px-4 py-2.5 text-sm",
-                    "placeholder:text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30",
-                    "max-h-[600px] min-h-[44px] overflow-y-auto transition-all",
-                    "focus:bg-background shadow-inner",
-                  )}
-                  style={{
-                    height: "auto",
-                    minHeight: "44px",
-                  }}
-                  onInput={(e) => {
-                    const target = e.target as HTMLTextAreaElement;
-                    target.style.height = "auto";
-                    target.style.height = Math.min(target.scrollHeight, 600) + "px";
-                  }}
-                />
-                <div className="flex flex-col gap-1">
-                  {stream.isStreaming ? (
-                    <button
-                      onClick={stream.cancel}
-                      className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all bg-destructive/10 text-destructive hover:bg-destructive/20 shadow-sm"
-                      title={t("chat.stopGenerating")}
-                    >
-                      <Square className="w-4 h-4 fill-current" />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleSend()}
-                      disabled={!input.trim()}
-                      className={cn(
-                        "shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all shadow-md",
-                        input.trim()
-                          ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-primary/20 hover:-translate-y-0.5"
-                          : "bg-muted text-muted-foreground cursor-not-allowed",
-                      )}
-                    >
-                      <Send
-                        className={cn(
-                          "w-4 h-4",
-                          input.trim() && "animate-in fade-in zoom-in duration-300",
-                        )}
-                      />
-                    </button>
-                  )}
+              {/* Messages area */}
+              {messages.length === 0 ? (
+                <SuggestionChips onSelect={handleSend} />
+              ) : (
+                <div
+                  ref={scrollContainerRef}
+                  className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-3 relative"
+                >
+                  <AnimatePresence>
+                    {messages.map((msg) => (
+                      <div key={msg.id} data-message-id={msg.id}>
+                        <MessageBubble message={msg} />
+                      </div>
+                    ))}
+                  </AnimatePresence>
+                  {/* ThinkingTimeline + TypingIndicator now rendered inside MessageBubble */}
+                  {/* Bottom spacer = container height, enables user-message scroll-to-top */}
+                  <div ref={spacerRef} aria-hidden />
                 </div>
+              )}
+
+              {/* Input area */}
+              <div className="shrink-0 px-4 pb-4 pt-0 border-t bg-background/80 backdrop-blur-md relative group/input flex flex-col">
+                {/* Internal Resize Handle */}
+                <div
+                  className="w-full h-1.5 cursor-ns-resize flex items-center justify-center group/handle py-2"
+                  onMouseDown={(e) => {
+                    const startY = e.clientY;
+                    const startHeight = inputRef.current?.offsetHeight || 0;
+                    const onMouseMove = (moveEvent: MouseEvent) => {
+                      if (inputRef.current) {
+                        const delta = startY - moveEvent.clientY;
+                        const newHeight = Math.max(36, Math.min(600, startHeight + delta));
+                        inputRef.current.style.height = `${newHeight}px`;
+                      }
+                    };
+                    const onMouseUp = () => {
+                      window.removeEventListener("mousemove", onMouseMove);
+                      window.removeEventListener("mouseup", onMouseUp);
+                    };
+                    window.addEventListener("mousemove", onMouseMove);
+                    window.addEventListener("mouseup", onMouseUp);
+                  }}
+                >
+                  <div className="w-8 h-1 rounded-full bg-muted-foreground/10 group-hover/handle:bg-primary/30 transition-all group-hover/handle:w-12" />
+                </div>
+
+                <div className="flex items-end gap-2 relative">
+                  <textarea
+                    ref={inputRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={t("chat.inputPlaceholder")}
+                    rows={1}
+                    className={cn(
+                      "flex-1 resize-none rounded-2xl border border-input bg-muted/30 px-4 py-2.5 text-sm",
+                      "placeholder:text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30",
+                      "max-h-[600px] min-h-[44px] overflow-y-auto transition-all",
+                      "focus:bg-background shadow-inner",
+                    )}
+                    style={{
+                      height: "auto",
+                      minHeight: "44px",
+                    }}
+                    onInput={(e) => {
+                      const target = e.target as HTMLTextAreaElement;
+                      target.style.height = "auto";
+                      target.style.height = Math.min(target.scrollHeight, 600) + "px";
+                    }}
+                  />
+                  <div className="flex flex-col gap-1">
+                    {stream.isStreaming ? (
+                      <button
+                        onClick={stream.cancel}
+                        className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all bg-destructive/10 text-destructive hover:bg-destructive/20 shadow-sm"
+                        title={t("chat.stopGenerating")}
+                      >
+                        <Square className="w-4 h-4 fill-current" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleSend()}
+                        disabled={!input.trim()}
+                        className={cn(
+                          "shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all shadow-md",
+                          input.trim()
+                            ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-primary/20 hover:-translate-y-0.5"
+                            : "bg-muted text-muted-foreground cursor-not-allowed",
+                        )}
+                      >
+                        <Send
+                          className={cn(
+                            "w-4 h-4",
+                            input.trim() && "animate-in fade-in zoom-in duration-300",
+                          )}
+                        />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p className="text-[9px] text-muted-foreground/50 mt-1 text-center">
+                  {t("chat.inputHint")}
+                </p>
               </div>
-              <p className="text-[9px] text-muted-foreground/50 mt-1 text-center">
-                {t("chat.inputHint")}
-              </p>
-            </div>
             </div>
           </div>
         </AllSourcesCtx.Provider>
