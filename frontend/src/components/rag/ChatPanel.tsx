@@ -1830,7 +1830,19 @@ export const ChatPanel = memo(function ChatPanel({
       }
       streamingMsgIdRef.current = null;
     },
-    [input, messages, stream, thinkingSupported, enableThinking, forceSearch, scrollUserMsgToTop],
+    [
+      input,
+      messages,
+      stream,
+      thinkingSupported,
+      enableThinking,
+      forceSearch,
+      scrollUserMsgToTop,
+      selectedConversationId,
+      t,
+      updateConvMutation,
+      conversations,
+    ],
   );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
