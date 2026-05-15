@@ -1,7 +1,5 @@
 import asyncio
 import asyncpg
-from sqlalchemy import create_engine, text
-from sqlalchemy.ext.asyncio import create_async_engine
 import os
 from dotenv import load_dotenv
 

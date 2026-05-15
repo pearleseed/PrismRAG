@@ -1,5 +1,4 @@
 import logging
-import sys
 import re
 from rich.logging import RichHandler
 from rich.console import Console
@@ -82,10 +81,10 @@ def setup_logging(log_level: str = "INFO"):
     ]
 
     for name in target_loggers:
-        l = logging.getLogger(name)
-        l.handlers = []
-        l.propagate = True  # Let them bubble up to root's rich_handler
-        l.setLevel(level)
+        log_obj = logging.getLogger(name)
+        log_obj.handlers = []
+        log_obj.propagate = True  # Let them bubble up to root's rich_handler
+        log_obj.setLevel(level)
 
     # 3. Handle uvicorn's internal logging configuration
     # Note: Uvicorn often resets logging in its worker/reloader processes.

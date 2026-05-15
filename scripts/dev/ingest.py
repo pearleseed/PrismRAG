@@ -7,7 +7,7 @@ version: 0.1
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional, List, Union
+from typing import Optional, List
 import os
 import json
 import asyncio
@@ -188,7 +188,7 @@ class Filter:
         __files__: Optional[List[dict]] = None,
     ) -> dict:
         """Modify the request body or validate it before processing."""
-        print(f"--- PrismRAG Ingestion Filter: inlet start ---")
+        print("--- PrismRAG Ingestion Filter: inlet start ---")
 
         # 1. Collect all potential files from various sources in the request
         all_files = []
@@ -263,11 +263,11 @@ class Filter:
                         f"Uploading {download_count} file(s) to PrismRAG (Workspace: {self.valves.workspace_id})..."
                     )
                     await self.run_ingestion(tmp_path, recursive=False)
-                    print(f"PrismRAG ingestion completed successfully.")
+                    print("PrismRAG ingestion completed successfully.")
                 except Exception as e:
                     print(f"PrismRAG Ingestion failed: {e}")
 
-        print(f"--- PrismRAG Ingestion Filter: inlet end ---")
+        print("--- PrismRAG Ingestion Filter: inlet end ---")
         return body
 
     async def outlet(self, body: dict, __user__: Optional[dict] = None) -> dict:

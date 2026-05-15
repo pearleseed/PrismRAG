@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
@@ -20,6 +20,7 @@ export function KnowledgeBasesPage() {
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [openMenu, setOpenMenu] = useState<number | null>(null);
+  const isSubmitting = useRef(false);
 
   // Close menu on outside click
   useEffect(() => {
@@ -29,8 +30,11 @@ export function KnowledgeBasesPage() {
     return () => document.removeEventListener("click", close);
   }, [openMenu]);
 
-  const handleCreateWorkspace = async () => {
-    if (!newWorkspaceName.trim() || createWorkspace.isPending) return;
+  const handleCreateWorkspace = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!newWorkspaceName.trim() || isSubmitting.current || createWorkspace.isPending) return;
+
+    isSubmitting.current = true;
     try {
       const ws = await createWorkspace.mutateAsync({ name: newWorkspaceName });
       toast.success(t("kb.kbCreated"));
@@ -39,6 +43,8 @@ export function KnowledgeBasesPage() {
       navigate(`/knowledge-bases/${ws.id}`);
     } catch {
       toast.error("Failed to create knowledge base");
+    } finally {
+      isSubmitting.current = false;
     }
   };
 
@@ -87,38 +93,35 @@ export function KnowledgeBasesPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
             <Card className="w-full max-w-md mx-4 shadow-2xl">
               <CardContent className="pt-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">{t("kb.newKnowledgeBase")}</h3>
-                  <button
-                    onClick={() => setShowNewWorkspace(false)}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-muted transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                <Input
-                  placeholder={t("kb.kbNamePlaceholder")}
-                  value={newWorkspaceName}
-                  onChange={(e) => setNewWorkspaceName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleCreateWorkspace();
-                    }
-                  }}
-                  autoFocus
-                />
-                <div className="flex justify-end gap-2 mt-4">
-                  <Button variant="ghost" onClick={() => setShowNewWorkspace(false)}>
-                    {t("common.cancel")}
-                  </Button>
-                  <Button
-                    onClick={handleCreateWorkspace}
-                    disabled={createWorkspace.isPending || !newWorkspaceName.trim()}
-                  >
-                    {createWorkspace.isPending ? t("common.creating") : t("common.create")}
-                  </Button>
-                </div>
+                <form onSubmit={handleCreateWorkspace}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold">{t("kb.newKnowledgeBase")}</h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewWorkspace(false)}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-muted transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <Input
+                    placeholder={t("kb.kbNamePlaceholder")}
+                    value={newWorkspaceName}
+                    onChange={(e) => setNewWorkspaceName(e.target.value)}
+                    autoFocus
+                  />
+                  <div className="flex justify-end gap-2 mt-4">
+                    <Button type="button" variant="ghost" onClick={() => setShowNewWorkspace(false)}>
+                      {t("common.cancel")}
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={createWorkspace.isPending || !newWorkspaceName.trim()}
+                    >
+                      {createWorkspace.isPending ? t("common.creating") : t("common.create")}
+                    </Button>
+                  </div>
+                </form>
               </CardContent>
             </Card>
           </div>

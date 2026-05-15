@@ -11,14 +11,13 @@ Usage:
 """
 
 import argparse
-import asyncio
 import json
 import re
 import sys
 import time
+from typing import Any
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 import requests
 
@@ -603,7 +602,7 @@ def run_deepeval_metrics(tc: TestCase, judge_model) -> list[MetricResult]:
 
 def call_debug_chat(workspace_id: int, tc: TestCase) -> dict:
     """Call the debug-chat endpoint and return full response."""
-    payload = {"message": tc.question}
+    payload: dict[str, Any] = {"message": tc.question}
     if tc.history:
         payload["history"] = tc.history
 

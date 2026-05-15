@@ -26,6 +26,7 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 
 # Import all models here so Alembic can discover them
+from app import models  # noqa: F401
 
 target_metadata = Base.metadata
 

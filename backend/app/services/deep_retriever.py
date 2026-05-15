@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models.document import DocumentImage, DocumentTable
 from app.services.embedder import EmbeddingService
-from app.services.vector_store import VectorStore
+from app.services.vector_store.base import BaseVectorStore
 from app.services.knowledge_graph_service import KnowledgeGraphService
 from app.services.reranker import RerankerService, get_reranker_service
 from app.services.models.parsed_document import (
@@ -47,7 +47,7 @@ class DeepRetriever:
         self,
         workspace_id: int,
         kg_service: Optional[KnowledgeGraphService],
-        vector_store: VectorStore,
+        vector_store: BaseVectorStore,
         embedder: EmbeddingService,
         db: Optional[AsyncSession] = None,
         reranker: Optional[RerankerService] = None,
@@ -126,7 +126,7 @@ class DeepRetriever:
                     self._find_related_tables(page_nos),
                 )
 
-        # Assemble context
+        # Assemble context (D-01)
         context = self._assemble_context(
             chunks, citations, kg_summary, image_refs, table_refs
         )
@@ -209,6 +209,16 @@ class DeepRetriever:
             if table_ids_str and isinstance(table_ids_str, str):
                 table_refs = [tid for tid in table_ids_str.split("|") if tid]
 
+            image_captions = []
+            img_cap_str = meta.get("image_captions", "")
+            if img_cap_str and isinstance(img_cap_str, str):
+                image_captions = [c for c in img_cap_str.split("|") if c]
+
+            table_summaries = []
+            tbl_sum_str = meta.get("table_summaries", "")
+            if tbl_sum_str and isinstance(tbl_sum_str, str):
+                table_summaries = [s for s in tbl_sum_str.split("|") if s]
+
             chunk = EnrichedChunk(
                 content=doc_text,
                 chunk_index=meta.get("chunk_index", i),
@@ -218,6 +228,8 @@ class DeepRetriever:
                 heading_path=heading_path,
                 image_refs=image_refs,
                 table_refs=table_refs,
+                image_captions=image_captions,
+                table_summaries=table_summaries,
                 has_table=meta.get("has_table", False),
                 has_code=meta.get("has_code", False),
             )
@@ -379,6 +391,22 @@ class DeepRetriever:
             for i, (chunk, citation) in enumerate(zip(chunks, citations)):
                 parts.append(f"### [{i + 1}] {citation.format()}")
                 parts.append(chunk.content)
+
+                # Clearly demarcate AI-generated metadata from source text (D-02)
+                if chunk.image_captions:
+                    parts.append(
+                        "\n**[AI-Generated Image Descriptions for this section]:**"
+                    )
+                    for cap in chunk.image_captions:
+                        parts.append(f"- {cap}")
+
+                if chunk.table_summaries:
+                    parts.append(
+                        "\n**[AI-Generated Table Summaries for this section]:**"
+                    )
+                    for summary in chunk.table_summaries:
+                        parts.append(f"- {summary}")
+
                 parts.append("")
 
         # Available images

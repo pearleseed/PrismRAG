@@ -6,10 +6,8 @@ version: 1.2.0
 description: Professional bridge for syncing Open WebUI attachments to PrismRAG (Docling/Marker/KG).
 """
 
-import os
 import requests
 import logging
-import asyncio
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field
 from pathlib import Path

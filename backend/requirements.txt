@@ -13,6 +13,7 @@ alembic>=1.12.0
 
 # Vector store
 chromadb>=0.4.22
+qdrant-client>=1.8.0
 
 # Embeddings & reranking
 sentence-transformers>=2.2.2
@@ -44,3 +45,4 @@ aiofiles>=23.2.1
 Pillow>=10.0.0
 rich>=13.7.0
 psycopg2-binary>=2.9.12
+filetype>=1.2.0

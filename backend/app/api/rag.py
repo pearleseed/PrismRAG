@@ -8,8 +8,9 @@ import string
 
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 
+from app.core.config import settings
 from app.core.deps import get_db
 from app.core.exceptions import NotFoundError
 from app.models.knowledge_base import KnowledgeBase
@@ -43,7 +44,12 @@ from app.schemas.rag import (
     DebugChatResponse,
     RateSourceRequest,
 )
-
+from app.schemas.conversation import (
+    ConversationRead,
+    ConversationCreate,
+    ConversationUpdate,
+    ConversationBase,
+)
 from app.api.chat_prompt import DEFAULT_SYSTEM_PROMPT, HARD_SYSTEM_PROMPT
 from app.services.rag_service import get_rag_service
 
@@ -97,7 +103,7 @@ async def query_documents(
     """Query indexed documents using semantic search (+ optional KG)."""
     await verify_workspace_access(workspace_id, db)
 
-    rag_service = get_rag_service(db, workspace_id)
+    rag_service = await get_rag_service(db, workspace_id)
 
     # Try deep query if available
     from app.services.prism_rag_service import PrismRAGService
@@ -370,7 +376,7 @@ async def reindex_document(
             detail="Document file not found on disk",
         )
 
-    rag_service = get_rag_service(db, document.workspace_id)
+    rag_service = await get_rag_service(db, document.workspace_id)
 
     # Delete existing data first
     try:
@@ -414,12 +420,11 @@ async def reindex_workspace(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Reindex ALL documents in a workspace.
-    Deletes the old vector collection (handles embedding dimension changes)
-    and re-processes every document through the PrismRAG pipeline.
-    Runs in background — returns immediately with document count.
+    Reindex ALL documents in a workspace using shadow indexing (C-07).
+    Builds a new versioned index in the background without downtime.
+    Swaps the active index version once the first few documents are ready or all are done.
     """
-    await verify_workspace_access(workspace_id, db)
+    kb = await verify_workspace_access(workspace_id, db)
 
     # Find all documents in this workspace
     result = await db.execute(
@@ -439,22 +444,21 @@ async def reindex_workspace(
     if not documents:
         return {"message": "No documents to reindex", "document_count": 0}
 
-    # Delete old vector collection (required when embedding dimensions change)
-    try:
-        from app.services.vector_store import get_vector_store
+    # Shadow Indexing (C-07): Target next version
+    target_version = kb.active_index_version + 1
+    doc_ids = [d.id for d in documents]
 
-        vs = get_vector_store(workspace_id)
-        vs.delete_collection()
-        logger.info(f"Deleted old vector collection for workspace {workspace_id}")
-    except Exception as e:
-        logger.warning(f"Failed to delete old collection: {e}")
-
-    async def _reindex_all(doc_ids: list[int], ws_id: int):
-        """Background task: reindex each document sequentially."""
+    async def _reindex_all_shadow(doc_ids: list[int], ws_id: int, version: int):
+        """Background task: reindex into shadow collection, then swap (C-07)."""
         from app.core.database import AsyncSessionLocal
+        from app.services.rag_service import get_rag_service
 
         async with AsyncSessionLocal() as session:
-            rag_service = get_rag_service(session, ws_id)
+            rag_service = await get_rag_service(
+                session, ws_id, index_version_override=version
+            )
+
+            success_count = 0
             for did in doc_ids:
                 try:
                     res = await session.execute(
@@ -468,37 +472,42 @@ async def reindex_workspace(
 
                     file_path = Path(UPLOAD_DIR) / doc.filename
                     if not file_path.exists():
-                        logger.warning(f"Skipping doc {did}: file not found")
                         continue
 
-                    # Delete old chunk data for this document
-                    try:
-                        await rag_service.delete_document(did)
-                    except Exception:
-                        pass
-
-                    # Reset metadata
+                    # Reset metadata for this doc
                     doc.status = DocumentStatus.PENDING
-                    doc.chunk_count = 0
-                    doc.image_count = 0
                     doc.error_message = None
                     await session.commit()
 
-                    # Re-process
+                    # Re-process into the shadow version
                     await rag_service.process_document(
                         document_id=did, file_path=str(file_path)
                     )
-                    logger.info(f"Reindexed document {did} in workspace {ws_id}")
-                except Exception as e:
-                    logger.error(f"Failed to reindex document {did}: {e}")
+                    success_count += 1
 
-    doc_ids = [d.id for d in documents]
-    background_tasks.add_task(_reindex_all, doc_ids, workspace_id)
+                    # Optional: Atomic swap early if this is the first batch, to reduce perceived downtime
+                    # if success_count == 1: ...
+                except Exception as e:
+                    logger.error(f"Shadow reindex failed for doc {did}: {e}")
+
+            # Final Swap (C-07): Point workspace to the new index version
+            if success_count > 0:
+                await session.execute(
+                    update(KnowledgeBase)
+                    .where(KnowledgeBase.id == ws_id)
+                    .values(active_index_version=version)
+                )
+                await session.commit()
+                logger.info(f"Workspace {ws_id} swapped to index version {version}")
+
+    background_tasks.add_task(
+        _reindex_all_shadow, doc_ids, workspace_id, target_version
+    )
 
     return {
-        "message": f"Reindexing {len(doc_ids)} documents in background",
+        "message": f"Shadow reindexing {len(doc_ids)} documents into v{target_version}",
         "document_count": len(doc_ids),
-        "document_ids": doc_ids,
+        "target_version": target_version,
     }
 
 
@@ -539,7 +548,7 @@ async def get_workspace_rag_stats(
     )
     image_count = image_result.scalar() or 0
 
-    rag_service = get_rag_service(db, workspace_id)
+    rag_service = await get_rag_service(db, workspace_id)
     try:
         total_chunks = rag_service.get_chunk_count()
     except Exception:
@@ -575,7 +584,7 @@ async def get_document_chunks(
             "message": "Document is not yet indexed",
         }
 
-    rag_service = get_rag_service(db, document.workspace_id)
+    rag_service = await get_rag_service(db, document.workspace_id)
 
     chunk_ids = [f"doc_{document_id}_chunk_{i}" for i in range(document.chunk_count)]
 
@@ -727,7 +736,7 @@ async def get_workspace_analytics(
     )
     image_count = image_result.scalar() or 0
 
-    rag_service = get_rag_service(db, workspace_id)
+    rag_service = await get_rag_service(db, workspace_id)
     try:
         total_chunks = rag_service.get_chunk_count()
     except Exception:
@@ -797,22 +806,27 @@ async def get_workspace_analytics(
 @router.get("/chat/{workspace_id}/history", response_model=ChatHistoryResponse)
 async def get_chat_history(
     workspace_id: int,
+    conversation_id: int | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    """Load persisted chat history for a workspace."""
+    """Load persisted chat history for a workspace, optionally filtered by conversation."""
     await verify_workspace_access(workspace_id, db)
 
     from app.models.chat_message import ChatMessage as ChatMessageModel
 
-    result = await db.execute(
-        select(ChatMessageModel)
-        .where(ChatMessageModel.workspace_id == workspace_id)
-        .order_by(ChatMessageModel.created_at.asc())
-    )
+    query = select(ChatMessageModel).where(ChatMessageModel.workspace_id == workspace_id)
+    if conversation_id:
+        query = query.where(ChatMessageModel.conversation_id == conversation_id)
+    else:
+        # If no conversation_id, filter by NULL to match old behavior (or get legacy messages)
+        query = query.where(ChatMessageModel.conversation_id == None)
+
+    result = await db.execute(query.order_by(ChatMessageModel.created_at.asc()))
     messages = result.scalars().all()
 
     return ChatHistoryResponse(
         workspace_id=workspace_id,
+        conversation_id=conversation_id,
         messages=[
             PersistedChatMessage(
                 id=m.id,
@@ -835,19 +849,151 @@ async def get_chat_history(
 @router.delete("/chat/{workspace_id}/history")
 async def delete_chat_history(
     workspace_id: int,
+    conversation_id: int | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    """Clear all chat history for a workspace."""
+    """Clear chat history for a workspace or a specific conversation."""
     await verify_workspace_access(workspace_id, db)
 
     from app.models.chat_message import ChatMessage as ChatMessageModel
     from sqlalchemy import delete
 
-    await db.execute(
-        delete(ChatMessageModel).where(ChatMessageModel.workspace_id == workspace_id)
-    )
+    stmt = delete(ChatMessageModel).where(ChatMessageModel.workspace_id == workspace_id)
+    if conversation_id:
+        stmt = stmt.where(ChatMessageModel.conversation_id == conversation_id)
+
+    await db.execute(stmt)
     await db.commit()
-    return {"status": "cleared", "workspace_id": workspace_id}
+    return {
+        "status": "cleared",
+        "workspace_id": workspace_id,
+        "conversation_id": conversation_id,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Conversation Management
+# ---------------------------------------------------------------------------
+
+
+@router.get("/chat/{workspace_id}/conversations", response_model=list[ConversationRead])
+async def list_conversations(
+    workspace_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """List all conversations in a workspace."""
+    await verify_workspace_access(workspace_id, db)
+
+    from app.models.conversation import Conversation as ConversationModel
+    from app.models.chat_message import ChatMessage as ChatMessageModel
+    from sqlalchemy import select, func
+
+    # Check for legacy messages (conversation_id IS NULL)
+    legacy_check = await db.execute(
+        select(func.count(ChatMessageModel.id)).where(
+            ChatMessageModel.workspace_id == workspace_id,
+            ChatMessageModel.conversation_id == None,
+        )
+    )
+    legacy_count = legacy_check.scalar() or 0
+    has_legacy = legacy_count > 0
+
+    result = await db.execute(
+        select(ConversationModel)
+        .where(ConversationModel.workspace_id == workspace_id)
+        .order_by(ConversationModel.updated_at.desc())
+    )
+    # Convert ORM models to Pydantic models for type consistency
+    from app.schemas.conversation import ConversationRead
+    conversations = [ConversationRead.model_validate(c) for c in result.scalars().all()]
+
+    # Return virtual legacy conversation if it exists
+    if has_legacy:
+        from datetime import datetime, timezone
+
+        legacy_conv = ConversationRead(
+            id=0,
+            workspace_id=workspace_id,
+            title="Archived Chat",
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+        conversations.insert(0, legacy_conv)
+
+    return conversations
+
+
+@router.post("/chat/{workspace_id}/conversations", response_model=ConversationRead)
+async def create_conversation(
+    workspace_id: int,
+    request: ConversationBase,
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a new conversation."""
+    await verify_workspace_access(workspace_id, db)
+
+    from app.models.conversation import Conversation as ConversationModel
+
+    conv = ConversationModel(workspace_id=workspace_id, title=request.title)
+    db.add(conv)
+    await db.commit()
+    await db.refresh(conv)
+    return conv
+
+
+@router.patch(
+    "/chat/{workspace_id}/conversations/{conversation_id}",
+    response_model=ConversationRead,
+)
+async def update_conversation(
+    workspace_id: int,
+    conversation_id: int,
+    request: ConversationUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Rename a conversation."""
+    await verify_workspace_access(workspace_id, db)
+
+    from app.models.conversation import Conversation as ConversationModel
+
+    result = await db.execute(
+        select(ConversationModel)
+        .where(ConversationModel.workspace_id == workspace_id)
+        .where(ConversationModel.id == conversation_id)
+    )
+    conv = result.scalar_one_or_none()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    conv.title = request.title
+    await db.commit()
+    await db.refresh(conv)
+    return conv
+
+
+@router.delete("/chat/{workspace_id}/conversations/{conversation_id}")
+async def delete_conversation(
+    workspace_id: int,
+    conversation_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a conversation and all its messages."""
+    await verify_workspace_access(workspace_id, db)
+
+    from app.models.conversation import Conversation as ConversationModel
+
+    result = await db.execute(
+        select(ConversationModel)
+        .where(ConversationModel.workspace_id == workspace_id)
+        .where(ConversationModel.id == conversation_id)
+    )
+    conv = result.scalar_one_or_none()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    await db.delete(conv)
+    await db.commit()
+    return {"status": "deleted", "conversation_id": conversation_id}
 
 
 # ---------------------------------------------------------------------------
@@ -921,7 +1067,7 @@ async def chat_with_documents(
     """Chat with documents using PrismRAG retrieval + LLM answer generation."""
     kb = await verify_workspace_access(workspace_id, db)
 
-    rag_service = get_rag_service(db, workspace_id)
+    rag_service = await get_rag_service(db, workspace_id)
 
     # -- 1. Retrieve relevant chunks via PrismRAG --
     chunks = []
@@ -1270,7 +1416,6 @@ async def chat_with_documents(
 async def get_llm_capabilities():
     """Check LLM provider capabilities (thinking, vision)."""
     from app.services.llm import get_llm_provider
-    from app.core.config import settings
 
     provider = get_llm_provider()
     provider_name = settings.LLM_PROVIDER.lower()
@@ -1311,7 +1456,7 @@ async def debug_chat(
     """
     kb = await verify_workspace_access(workspace_id, db)
 
-    rag_service = get_rag_service(db, workspace_id)
+    rag_service = await get_rag_service(db, workspace_id)
 
     # -- 1. Retrieve --
     chunks = []

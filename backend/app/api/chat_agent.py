@@ -24,14 +24,16 @@ import logging
 import random
 import re
 import string
+import time
 import uuid
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Callable
 
 from fastapi import HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.database import async_session_maker
 from app.models.knowledge_base import KnowledgeBase
 from app.models.document import DocumentImage
 from app.schemas.rag import (
@@ -279,15 +281,23 @@ async def sse_with_heartbeat(
     SSE spec allows lines starting with ':' as comments — browsers/clients
     silently ignore them but they keep the TCP connection alive, preventing
     timeouts when the upstream LLM takes a long time to respond.
+
+    Features:
+    - Bounded queue (maxsize=100) for backpressure.
+    - Source exception forwarding to client.
+    - Explicit cancellation propagation.
     """
-    queue: asyncio.Queue[str | None] = asyncio.Queue()
+    # Use str | Exception | None to forward errors
+    queue: asyncio.Queue[str | Exception | None] = asyncio.Queue(maxsize=100)
 
     async def _pump():
         try:
             async for event in source:
                 await queue.put(event)
-        except Exception:
-            pass
+        except Exception as e:
+            # Forward the exception so the main loop can handle it
+            logger.error(f"sse_with_heartbeat source error: {e}", exc_info=True)
+            await queue.put(e)
         finally:
             await queue.put(None)  # sentinel
 
@@ -295,20 +305,26 @@ async def sse_with_heartbeat(
     try:
         while True:
             try:
-                event = await asyncio.wait_for(
+                item = await asyncio.wait_for(
                     queue.get(), timeout=SSE_HEARTBEAT_INTERVAL
                 )
-                if event is None:
+                if item is None:
                     break
-                yield event
+                if isinstance(item, Exception):
+                    # Yield as SSE error event before breaking
+                    yield format_sse_event("error", {"message": str(item)})
+                    break
+                yield item
             except asyncio.TimeoutError:
                 yield ": heartbeat\n\n"
     finally:
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
+        # Ensure the source task is cancelled if the generator is closed
+        if not task.done():
+            task.cancel()
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
 
 
 # ---------------------------------------------------------------------------
@@ -320,19 +336,33 @@ async def _execute_search_documents(
     workspace_id: int,
     query: str,
     top_k: int,
-    db: AsyncSession,
     existing_ids: set[str],
+    db: AsyncSession | None = None,
+    session_factory: Callable[[], AsyncSession] | None = None,
 ) -> tuple[str, list[ChatSourceChunk], list[ChatImageRef], list[dict]]:
     """Execute document search and return formatted context + structured sources.
 
     Returns:
         (context_text, sources, image_refs, image_parts_for_vision)
     """
+    if not db and session_factory:
+        async with session_factory() as fresh_session:
+            return await _execute_search_documents(
+                workspace_id=workspace_id,
+                query=query,
+                top_k=top_k,
+                existing_ids=existing_ids,
+                db=fresh_session,
+            )
+
+    if not db:
+        raise ValueError("Either db or session_factory must be provided")
+
     from app.services.rag_service import get_rag_service
     from app.services.prism_rag_service import PrismRAGService
     from pathlib import Path as _P
 
-    rag_service = get_rag_service(db, workspace_id)
+    rag_service = await get_rag_service(db, workspace_id)
 
     chunks = []
     citations = []
@@ -495,8 +525,9 @@ async def agent_chat_stream(
     message: str,
     history: list[dict],
     enable_thinking: bool,
-    db: AsyncSession,
     system_prompt: str,
+    db: AsyncSession | None = None,
+    session_factory: Callable[[], AsyncSession] | None = None,
     force_search: bool = False,
 ) -> AsyncGenerator[dict, None]:
     """Semi-agentic chat loop with streaming.
@@ -543,12 +574,14 @@ async def agent_chat_stream(
         }
 
         context, sources, images, img_parts = await _execute_search_documents(
-            workspace_id,
-            message,
-            8,
-            db,
-            existing_ids,
+            workspace_id=workspace_id,
+            query=message,
+            top_k=8,
+            existing_ids=existing_ids,
+            db=db,
+            session_factory=session_factory,
         )
+
         all_sources.extend(sources)
         all_images.extend(images)
         all_image_parts.extend(img_parts)
@@ -677,11 +710,12 @@ async def agent_chat_stream(
                 }
 
                 context, sources, images, img_parts = await _execute_search_documents(
-                    workspace_id,
-                    query,
-                    top_k,
-                    db,
-                    existing_ids,
+                    workspace_id=workspace_id,
+                    query=query,
+                    top_k=top_k,
+                    existing_ids=existing_ids,
+                    db=db,
+                    session_factory=session_factory,
                 )
                 all_sources.extend(sources)
                 all_images.extend(images)
@@ -899,12 +933,14 @@ async def agent_chat_stream(
         }
 
         context, sources, images, img_parts = await _execute_search_documents(
-            workspace_id,
-            message,
-            8,
-            db,
-            existing_ids,
+            workspace_id=workspace_id,
+            query=message,
+            top_k=8,
+            existing_ids=existing_ids,
+            db=db,
+            session_factory=session_factory,
         )
+
         all_sources.extend(sources)
         all_images.extend(images)
         all_image_parts.extend(img_parts)
@@ -1035,6 +1071,7 @@ async def chat_stream_endpoint(
 
         user_row = ChatMessageModel(
             workspace_id=workspace_id,
+            conversation_id=request.conversation_id,
             message_id=str(uuid.uuid4()),
             role="user",
             content=request.message,
@@ -1046,11 +1083,11 @@ async def chat_stream_endpoint(
         await db.rollback()
 
     async def event_generator() -> AsyncGenerator[str, None]:
-        final_answer = ""
-        final_sources = []
-        final_images = []
-        final_thinking = None
         final_entities = []
+
+        start_time = time.time()
+        token_count = 0
+        is_completed = False
 
         # Collect agent steps for persistence (ThinkingTimeline survives reload)
         collected_steps: list[dict] = []
@@ -1065,7 +1102,7 @@ async def chat_stream_endpoint(
                 message=request.message,
                 history=history,
                 enable_thinking=request.enable_thinking,
-                db=db,
+                session_factory=async_session_maker,
                 system_prompt=system_prompt,
                 force_search=request.force_search,
             ):
@@ -1110,6 +1147,10 @@ async def chat_stream_endpoint(
                         }
                     )
 
+                # Track tokens for metrics
+                elif event_type == "token":
+                    token_count += 1
+
                 # Track sources/images as they arrive
                 elif event_type == "sources":
                     streaming_sources.extend(event_data.get("sources", []))
@@ -1128,6 +1169,7 @@ async def chat_stream_endpoint(
                             break
 
                 elif event_type == "complete":
+                    is_completed = True
                     final_answer = event_data.get("answer", "")
                     final_sources = event_data.get("sources", [])
                     final_images = event_data.get("image_refs", [])
@@ -1175,6 +1217,13 @@ async def chat_stream_endpoint(
             logger.error(f"Stream error: {e}", exc_info=True)
             yield format_sse_event("error", {"message": str(e)})
         finally:
+            duration = time.time() - start_time
+            status_str = "completed" if is_completed else "disconnected"
+            logger.info(
+                f"Stream {status_str}: workspace={workspace_id}, "
+                f"duration={duration:.2f}s, tokens={token_count}"
+            )
+
             # Persist assistant message
             if final_answer:
                 try:
@@ -1182,6 +1231,7 @@ async def chat_stream_endpoint(
 
                     assistant_row = ChatMessageModel(
                         workspace_id=workspace_id,
+                        conversation_id=request.conversation_id,
                         message_id=str(uuid.uuid4()),
                         role="assistant",
                         content=final_answer,
@@ -1193,11 +1243,11 @@ async def chat_stream_endpoint(
                         thinking=final_thinking,
                         agent_steps=collected_steps if collected_steps else None,
                     )
-                    db.add(assistant_row)
-                    await db.commit()
+                    async with async_session_maker() as fresh_db:
+                        fresh_db.add(assistant_row)
+                        await fresh_db.commit()
                 except Exception as e:
                     logger.warning(f"Failed to persist assistant message: {e}")
-                    await db.rollback()
 
     return StreamingResponse(
         sse_with_heartbeat(event_generator()),

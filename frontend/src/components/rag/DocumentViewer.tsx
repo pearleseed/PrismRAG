@@ -20,6 +20,28 @@ interface Heading {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+function getHeadingText(children: React.ReactNode): string {
+  if (typeof children === "string") return children;
+  if (Array.isArray(children)) return children.map(getHeadingText).join("");
+  if (children && typeof children === "object" && "props" in children) {
+    return getHeadingText(
+      (children as React.ReactElement<{ children?: React.ReactNode }>).props.children,
+    );
+  }
+  return String(children ?? "");
+}
+
+function generateHeadingId(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .slice(0, 80);
+}
+
+// ---------------------------------------------------------------------------
 // Skeleton loader
 // ---------------------------------------------------------------------------
 function ViewerSkeleton() {
@@ -101,8 +123,8 @@ const TOCSidebar = memo(function TOCSidebar({
         </button>
       </div>
       <ul className="space-y-0.5">
-        {headings.map((h) => (
-          <li key={h.id}>
+        {headings.map((h, idx) => (
+          <li key={`${h.id}-${idx}`}>
             <button
               onClick={() => onSelect(h.id)}
               className={cn(
@@ -143,18 +165,35 @@ function PageDivider({ pageNo }: { pageNo: number }) {
 // Extract headings from markdown for TOC
 // ---------------------------------------------------------------------------
 function extractHeadings(markdown: string): Heading[] {
+  if (!markdown) return [];
   const headings: Heading[] = [];
-  const lines = markdown.split("\n");
+  const lines = markdown.split(/\r?\n/);
+  const idCounts = new Map<string, number>();
+  let inCodeBlock = false;
+
   for (const line of lines) {
-    const match = line.match(/^(#{1,4})\s+(.+)/);
+    const trimmed = line.trim();
+    if (trimmed.startsWith("```")) {
+      inCodeBlock = !inCodeBlock;
+      continue;
+    }
+    if (inCodeBlock) continue;
+
+    // Support headings levels 1-6
+    const match = line.match(/^(#{1,6})\s+(.+)/);
     if (match) {
       const level = match[1].length;
-      const text = match[2].replace(/[*_`#]/g, "").trim();
-      const id = text
-        .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, "")
-        .replace(/\s+/g, "-")
-        .slice(0, 80);
+      let text = match[2];
+      // Strip common markdown formatting from the text for the TOC label
+      text = text.replace(/[*_`#[\]()]/g, "").trim();
+
+      const baseId = generateHeadingId(text);
+      if (!baseId) continue;
+
+      const count = idCounts.get(baseId) || 0;
+      const id = count === 0 ? baseId : `${baseId}-${count}`;
+      idCounts.set(baseId, count + 1);
+
       headings.push({ id, text, level });
     }
   }
@@ -198,6 +237,7 @@ export const DocumentViewer = memo(function DocumentViewer({
 }: DocumentViewerProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const pageCounterRef = useRef(1);
+  const headingCountsRef = useRef(new Map<string, number>());
   const [activeHeading, setActiveHeading] = useState<string | null>(null);
   const [showToc, setShowToc] = useState(true);
 
@@ -218,7 +258,6 @@ export const DocumentViewer = memo(function DocumentViewer({
 
   // ---- Process markdown (insert page dividers) ----
   const processedMarkdown = useMemo(() => {
-    pageCounterRef.current = 1; // reset on re-process
     return markdown ? insertPageDividers(markdown) : "";
   }, [markdown]);
 
@@ -226,85 +265,73 @@ export const DocumentViewer = memo(function DocumentViewer({
   // Without memoization, inline arrow functions create new references each render,
   // causing React to unmount/remount all heading elements — destroying highlight classes.
   const mdComponents = useMemo<import("react-markdown").Components>(
-    () => ({
-      h1: ({ children, ...props }) => {
-        const text = getHeadingText(children);
-        const id = generateHeadingId(text);
-        return (
-          <h1 id={id} {...props}>
-            {children}
-          </h1>
-        );
-      },
-      h2: ({ children, ...props }) => {
-        const text = getHeadingText(children);
-        const id = generateHeadingId(text);
-        return (
-          <h2 id={id} {...props}>
-            {children}
-          </h2>
-        );
-      },
-      h3: ({ children, ...props }) => {
-        const text = getHeadingText(children);
-        const id = generateHeadingId(text);
-        return (
-          <h3 id={id} {...props}>
-            {children}
-          </h3>
-        );
-      },
-      h4: ({ children, ...props }) => {
-        const text = getHeadingText(children);
-        const id = generateHeadingId(text);
-        return (
-          <h4 id={id} {...props}>
-            {children}
-          </h4>
-        );
-      },
-      hr: () => {
-        pageCounterRef.current += 1;
-        return <PageDivider pageNo={pageCounterRef.current} />;
-      },
-      p: ({ children, node, ...props }) => {
-        const hasImage =
-          node !== undefined &&
-          node.type === "element" &&
-          node.children.some((child) => child.type === "element" && child.tagName === "img");
-        if (hasImage)
+    () => {
+      const createHeading = (Tag: "h1" | "h2" | "h3" | "h4" | "h5" | "h6") => {
+        // oxlint-disable-next-line typescript/no-explicit-any
+        return ({ children, ...props }: any) => {
+          const text = getHeadingText(children);
+          const baseId = generateHeadingId(text);
+          const count = headingCountsRef.current.get(baseId) || 0;
+          const id = count === 0 ? baseId : `${baseId}-${count}`;
+          headingCountsRef.current.set(baseId, count + 1);
           return (
-            <div className="mb-3 leading-relaxed text-foreground/80" {...props}>
+            <Tag id={id} {...props}>
               {children}
-            </div>
+            </Tag>
           );
-        return <p {...props}>{children}</p>;
-      },
-      img: ({ src, alt, ...props }) => (
-        <figure className="my-4">
-          <img
-            src={src}
-            alt={alt || ""}
-            loading="lazy"
-            className="rounded-lg max-w-full mx-auto border border-border/30"
-            style={{ minHeight: 120, objectFit: "contain", background: "var(--muted)" }}
-            onLoad={(e) => {
-              (e.target as HTMLImageElement).style.minHeight = "auto";
-              (e.target as HTMLImageElement).style.background = "none";
-            }}
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
-            {...props}
-          />
-          {alt && (
-            <figcaption className="text-xs text-muted-foreground text-center mt-1.5 italic">
-              {alt}
-            </figcaption>
-          )}
-        </figure>
-      ),
-    }),
+        };
+      };
+
+      return {
+        h1: createHeading("h1"),
+        h2: createHeading("h2"),
+        h3: createHeading("h3"),
+        h4: createHeading("h4"),
+        h5: createHeading("h5"),
+        h6: createHeading("h6"),
+        hr: () => {
+          pageCounterRef.current += 1;
+          return <PageDivider pageNo={pageCounterRef.current} />;
+        },
+        p: ({ children, node, ...props }) => {
+          const hasImage =
+            node !== undefined &&
+            node.type === "element" &&
+            node.children.some((child) => child.type === "element" && child.tagName === "img");
+          if (hasImage)
+            return (
+              <div className="mb-3 leading-relaxed text-foreground/80" {...props}>
+                {children}
+              </div>
+            );
+          return <p {...props}>{children}</p>;
+        },
+        img: ({ src, alt, ...props }) => (
+          <figure className="my-4">
+            <img
+              src={src}
+              alt={alt || ""}
+              loading="lazy"
+              className="rounded-lg max-w-full mx-auto border border-border/30"
+              style={{ minHeight: 120, objectFit: "contain", background: "var(--muted)" }}
+              onLoad={(e) => {
+                (e.target as HTMLImageElement).style.minHeight = "auto";
+                (e.target as HTMLImageElement).style.background = "none";
+              }}
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+              {...props}
+            />
+            {alt && (
+              <figcaption className="text-xs text-muted-foreground text-center mt-1.5 italic">
+                {alt}
+              </figcaption>
+            )}
+          </figure>
+        ),
+      };
+    },
     [],
   );
 
@@ -429,11 +456,7 @@ export const DocumentViewer = memo(function DocumentViewer({
         }
 
         if (scrollToHeading) {
-          const targetId = scrollToHeading
-            .toLowerCase()
-            .replace(/[^a-z0-9\s-]/g, "")
-            .replace(/\s+/g, "-")
-            .slice(0, 80);
+          const targetId = generateHeadingId(scrollToHeading);
           const el = contentRef.current.querySelector(
             `#${CSS.escape(targetId)}`,
           ) as HTMLElement | null;
@@ -515,6 +538,10 @@ export const DocumentViewer = memo(function DocumentViewer({
   if (isLoading) return <ViewerSkeleton />;
   if (error) return <ViewerError message={(error as Error).message} />;
   if (!markdown || markdown.trim().length === 0) return <ViewerEmpty />;
+
+  // Reset counters before rendering markdown
+  pageCounterRef.current = 1;
+  headingCountsRef.current.clear();
 
   return (
     <div className="flex h-full min-h-0">
@@ -604,23 +631,5 @@ export const DocumentViewer = memo(function DocumentViewer({
 });
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Helpers (Legacy positions - moved up)
 // ---------------------------------------------------------------------------
-function getHeadingText(children: React.ReactNode): string {
-  if (typeof children === "string") return children;
-  if (Array.isArray(children)) return children.map(getHeadingText).join("");
-  if (children && typeof children === "object" && "props" in children) {
-    return getHeadingText(
-      (children as React.ReactElement<{ children?: React.ReactNode }>).props.children,
-    );
-  }
-  return String(children ?? "");
-}
-
-function generateHeadingId(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .slice(0, 80);
-}

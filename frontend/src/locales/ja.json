@@ -2,6 +2,7 @@
   "common": {
     "save": "保存",
     "cancel": "キャンセル",
+    "reset": "リセット",
     "delete": "削除",
     "edit": "編集",
     "loading": "読み込み中...",
@@ -147,7 +148,14 @@
     "think": "思考",
     "analyzingQuestion": "質問を解析中...",
     "searchingDocs": "ドキュメントを検索中...",
-    "generatingAnswer": "回答を生成中..."
+    "generatingAnswer": "回答を生成中...",
+    "newChat": "新しいチャット",
+    "conversations": "会話",
+    "conversationCreated": "会話を作成しました",
+    "conversationDeleted": "会話を削除しました",
+    "confirmDeleteConversation": "この会話を削除してもよろしいですか？すべてのメッセージが完全に削除されます。",
+    "rename": "名前の変更",
+    "conversationRenamed": "会話の名前を変更しました"
   },
   "kb": {
     "knowledgeBases": "ナレッジベース",

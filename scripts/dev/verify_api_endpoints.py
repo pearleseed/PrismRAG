@@ -6,7 +6,7 @@ Tests all documented API endpoints to ensure they're accessible and properly con
 
 import asyncio
 import sys
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 
 import httpx
 
@@ -84,7 +84,7 @@ class APIVerifier:
         passed = sum(1 for _, _, success, _ in self.results if success)
         failed = total - passed
 
-        print(f"\n📊 Summary:")
+        print("\n📊 Summary:")
         print(f"   Total endpoints tested: {total}")
         print(f"   ✅ Passed: {passed}")
         print(f"   ❌ Failed: {failed}")
@@ -94,7 +94,7 @@ class APIVerifier:
             print("   Make sure the backend is running: ./scripts/run_bk.sh")
             sys.exit(1)
         else:
-            print(f"\n🎉 All endpoints verified successfully!")
+            print("\n🎉 All endpoints verified successfully!")
             sys.exit(0)
 
 

@@ -59,6 +59,12 @@ class Document(Base):
     custom_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     relative_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
+    # Consistency Metadata (C-05, C-06)
+    index_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    embedding_model: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    embedding_dimension: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    document_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
     # Relationships
     workspace: Mapped["KnowledgeBase"] = relationship(back_populates="documents")
     images: Mapped[list["DocumentImage"]] = relationship(

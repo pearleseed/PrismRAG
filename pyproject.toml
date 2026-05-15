@@ -1,0 +1,29 @@
+[project]
+name = "prismrag"
+version = "0.1.0"
+description = "Hybrid Knowledge Base with Agentic Chat, Citations & Knowledge Graph"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.ruff]
+# Add backend to source roots so that 'app' can be resolved from the root
+src = ["backend", "."]
+
+[tool.pyright]
+# Help pyright find the 'app' package and virtual environment
+venvPath = "."
+venv = "venv"
+extraPaths = ["backend"]
+
+
+[tool.ty]
+
+[tool.ty.src]
+# Configure ty to include backend and root in its search paths
+include = ["backend", "."]
+
+[tool.ty.environment]
+# Target Python version for type checking
+python-version = "3.12"
+# Explicitly point to the virtual environment for better package discovery
+python = "venv"

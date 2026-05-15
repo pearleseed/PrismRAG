@@ -5,8 +5,11 @@ Handles splitting documents into smaller chunks for embedding and retrieval.
 
 from __future__ import annotations
 
+import logging
 from typing import NamedTuple
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+logger = logging.getLogger(__name__)
 
 
 class TextChunk(NamedTuple):
@@ -54,27 +57,55 @@ class DocumentChunker:
     ) -> list[TextChunk]:
         """
         Split text into chunks with metadata.
-
-        Args:
-            text: The text content to split
-            source: Source identifier (e.g., filename)
-            extra_metadata: Additional metadata to include with each chunk
-
-        Returns:
-            List of TextChunk objects with content and metadata
+        Uses language-specific splitting for code files.
         """
         if not text.strip():
             return []
 
-        # Use LangChain splitter
-        chunks = self._splitter.split_text(text)
+        # Determine language from source extension
+        language = None
+        if source:
+            ext = source.split(".")[-1].lower()
+            extension_map = {
+                "py": "python",
+                "js": "js",
+                "ts": "ts",
+                "go": "go",
+                "cpp": "cpp",
+                "c": "cpp",
+                "h": "cpp",
+                "java": "java",
+                "php": "php",
+                "rb": "ruby",
+                "rs": "rust",
+                "swift": "swift",
+            }
+            language = extension_map.get(ext)
+
+        # Use appropriate splitter
+        if language:
+            from langchain_text_splitters import Language
+
+            try:
+                lang_splitter = RecursiveCharacterTextSplitter.from_language(
+                    language=Language(language),
+                    chunk_size=self.chunk_size,
+                    chunk_overlap=self.chunk_overlap,
+                )
+                chunks = lang_splitter.split_text(text)
+            except Exception as e:
+                logger.warning(
+                    f"Failed to use language-specific splitter for {language}: {e}. Falling back to default."
+                )
+                chunks = self._splitter.split_text(text)
+        else:
+            chunks = self._splitter.split_text(text)
 
         result = []
         current_pos = 0
 
         for i, chunk_content in enumerate(chunks):
             # Find the actual position in the original text
-            # This is approximate due to overlap handling
             start_pos = text.find(chunk_content[:50], current_pos)
             if start_pos == -1:
                 start_pos = current_pos
@@ -87,6 +118,8 @@ class DocumentChunker:
                 "total_chunks": len(chunks),
                 **(extra_metadata or {}),
             }
+            if language:
+                metadata["language"] = language
 
             result.append(
                 TextChunk(
@@ -98,7 +131,6 @@ class DocumentChunker:
                 )
             )
 
-            # Update position for next search (accounting for overlap)
             current_pos = max(
                 start_pos + len(chunk_content) - self.chunk_overlap, current_pos + 1
             )

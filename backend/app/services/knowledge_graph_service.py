@@ -119,17 +119,20 @@ class KnowledgeGraphService:
         emb_provider = get_embedding_provider()
         embedding_dim = emb_provider.get_dimension()
 
-        # Detect dimension mismatch when switching providers
+        # Detect dimension mismatch when switching providers (C-05)
         dim_marker = Path(self.working_dir) / ".embedding_dim"
         if dim_marker.exists():
             prev_dim = int(dim_marker.read_text().strip())
             if prev_dim != embedding_dim:
-                logger.warning(
+                # (C-05) Never delete live KG data from request path.
+                logger.error(
                     f"Embedding dimension changed ({prev_dim} → {embedding_dim}) "
-                    f"for workspace {self.workspace_id}. Clearing KG data for rebuild."
+                    f"for workspace {self.workspace_id}. KG needs re-indexing."
                 )
-                shutil.rmtree(self.working_dir)
-                os.makedirs(self.working_dir, exist_ok=True)
+                raise ValueError(
+                    f"KG dimension mismatch: expected {prev_dim}, got {embedding_dim}. "
+                    "Manual re-index or migration required."
+                )
         dim_marker.write_text(str(embedding_dim))
 
         @wrap_embedding_func_with_attrs(
@@ -164,7 +167,7 @@ class KnowledgeGraphService:
         )
         return self._rag
 
-    async def ingest(self, markdown_content: str) -> None:
+    async def ingest(self, markdown_content: str, document_id: int) -> None:
         """
         Ingest markdown content into the knowledge graph.
         LightRAG extracts entities and relationships automatically.
@@ -173,14 +176,16 @@ class KnowledgeGraphService:
 
         if not markdown_content.strip():
             logger.warning(
-                f"Empty content for workspace {self.workspace_id}, skipping KG ingest"
+                f"Empty content for document {document_id}, workspace {self.workspace_id}, skipping KG ingest"
             )
             return
 
         try:
-            await rag.ainsert(markdown_content)
+            # Use document_id for provenance tracking (C-08)
+            await rag.ainsert(markdown_content, ids=[str(document_id)])
             logger.info(
-                f"KG ingested {len(markdown_content)} chars for workspace {self.workspace_id}"
+                f"KG ingested doc {document_id} ({len(markdown_content)} chars) "
+                f"for workspace {self.workspace_id}"
             )
 
             # Check if entities were actually extracted
@@ -267,6 +272,30 @@ class KnowledgeGraphService:
             logger.info(f"Deleted KG data for workspace {self.workspace_id}")
         self._rag = None
         self._initialized = False
+
+    async def delete_document_data(self, document_id: int) -> bool:
+        """
+        Delete a document's data from the knowledge graph (C-08).
+        Removes associated chunks, entities, and relationships.
+        """
+        rag = await self._get_rag()
+        try:
+            # LightRAG v0.0.3+ supports adelete_by_doc_id
+            # This handles graph consistency by removing doc-exclusive artifacts (C-08)
+            result = await rag.adelete_by_doc_id(str(document_id))
+
+            # Check if result is a namedtuple/object or dict
+            status = getattr(result, "status", "unknown")
+            if status == "success":
+                logger.info(f"Deleted KG data for document {document_id}")
+                return True
+            else:
+                msg = getattr(result, "message", str(result))
+                logger.warning(f"Failed to delete KG data for doc {document_id}: {msg}")
+                return False
+        except Exception as e:
+            logger.error(f"Error deleting KG data for doc {document_id}: {e}")
+            return False
 
     # ------------------------------------------------------------------
     # Knowledge Graph exploration (Phase 9)

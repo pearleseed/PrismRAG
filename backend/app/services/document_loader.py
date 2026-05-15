@@ -39,7 +39,7 @@ def load_txt_file(file_path: Path) -> LoadedDocument:
 def load_pdf_file(file_path: Path) -> LoadedDocument:
     """Load a PDF file and extract text."""
     try:
-        from pypdf import PdfReader  # ty:ignore[unresolved-import]
+        from pypdf import PdfReader
 
         reader = PdfReader(str(file_path))
         pages_text = []
@@ -92,11 +92,37 @@ def load_document(file_path: str | Path) -> LoadedDocument:
 
     suffix = path.suffix.lower()
 
+    code_extensions = [
+        ".py",
+        ".js",
+        ".ts",
+        ".go",
+        ".cpp",
+        ".c",
+        ".h",
+        ".java",
+        ".php",
+        ".rb",
+        ".rs",
+        ".swift",
+        ".kt",
+        ".sh",
+        ".sql",
+        ".yaml",
+        ".yml",
+        ".json",
+    ]
+
     loaders = {
         ".txt": load_txt_file,
         ".pdf": load_pdf_file,
         ".md": load_markdown_file,
     }
+
+    # Map code extensions to text loader
+    for ext in code_extensions:
+        if ext not in loaders:
+            loaders[ext] = load_txt_file
 
     loader = loaders.get(suffix)
     if loader is None:

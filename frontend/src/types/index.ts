@@ -233,8 +233,17 @@ export interface PersistedChatMessage {
 
 export interface ChatHistoryResponse {
   workspace_id: number;
+  conversation_id: number | null;
   messages: PersistedChatMessage[];
   total: number;
+}
+
+export interface Conversation {
+  id: number;
+  workspace_id: number;
+  title: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface LLMCapabilities {

@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.deps import get_db
+from app.core.database import async_session_maker
 from app.models.knowledge_base import KnowledgeBase
 from app.schemas.rag import ChatMessageSchema
 
@@ -401,7 +402,7 @@ async def _stream_openai_response(
     db: AsyncSession,
     origin: str,
 ) -> StreamingResponse:
-    from app.api.chat_agent import agent_chat_stream
+    from app.api.chat_agent import agent_chat_stream, sse_with_heartbeat
 
     completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
 
@@ -425,12 +426,11 @@ async def _stream_openai_response(
             completion_id, model_id, {"role": "assistant", "content": ""}
         )
 
-        sent_token = False
-        final_answer = ""
-        final_sources: list[Any] = []
-        final_images: list[Any] = []
-        final_thinking: str | None = None
         final_entities: list[str] = []
+
+        start_time = time.time()
+        token_count = 0
+        is_completed = False
 
         try:
             async for event in agent_chat_stream(
@@ -438,18 +438,19 @@ async def _stream_openai_response(
                 message=user_message,
                 history=history_dicts,
                 enable_thinking=False,
-                db=db,
+                session_factory=async_session_maker,
                 system_prompt=system_prompt,
                 force_search=False,
             ):
                 et = event["event"]
                 ed = event["data"]
                 if et == "token":
+                    token_count += 1
                     piece = ed.get("text", "")
                     if piece:
-                        sent_token = True
                         yield _chunk_openai(completion_id, model_id, {"content": piece})
                 elif et == "complete":
+                    is_completed = True
                     final_answer = ed.get("answer", "") or ""
                     final_sources = ed.get("sources") or []
                     final_images = ed.get("image_refs") or []
@@ -467,11 +468,18 @@ async def _stream_openai_response(
             return
 
         text = _publicize_backend_paths(final_answer.strip(), origin)
-        if not sent_token and text:
+        if token_count == 0 and text:
             yield _chunk_openai(completion_id, model_id, {"content": text})
 
         yield _chunk_openai(completion_id, model_id, {}, finish_reason="stop")
         yield "data: [DONE]\n\n"
+
+        duration = time.time() - start_time
+        status_str = "completed" if is_completed else "disconnected"
+        logger.info(
+            f"OpenAI Stream {status_str}: workspace={workspace_id}, "
+            f"duration={duration:.2f}s, tokens={token_count}"
+        )
 
         try:
             from app.models.chat_message import ChatMessage as ChatMessageModel
@@ -486,14 +494,14 @@ async def _stream_openai_response(
                 image_refs=final_images if final_images else None,
                 thinking=final_thinking,
             )
-            db.add(assistant_row)
-            await db.commit()
+            async with async_session_maker() as fresh_db:
+                fresh_db.add(assistant_row)
+                await fresh_db.commit()
         except Exception as e:
             logger.warning("openai_compat stream: assistant persist failed: %s", e)
-            await db.rollback()
 
     return StreamingResponse(
-        event_generator(),
+        sse_with_heartbeat(event_generator()),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

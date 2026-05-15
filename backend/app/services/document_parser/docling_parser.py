@@ -351,48 +351,29 @@ class DoclingDocumentParser(BaseDocumentParser):
 
             # ── Image-aware enrichment ──
             chunk_image_refs: list[str] = []
+            chunk_image_captions: list[str] = []
             if page_no > 0 and page_no in page_images:  # ty:ignore[unsupported-operator]
                 for img in page_images[page_no]:  # ty:ignore[invalid-argument-type]
                     if img.image_id not in assigned_images:
                         chunk_image_refs.append(img.image_id)
                         assigned_images.add(img.image_id)
-
-            enriched_text = chunk_text
-            if chunk_image_refs and images:
-                img_by_id = {im.image_id: im for im in images}
-                desc_parts = []
-                for img_id in chunk_image_refs:
-                    img = img_by_id.get(img_id)
-                    if img and img.caption:
-                        desc_parts.append(
-                            f"[Image on page {img.page_no}]: {img.caption}"
-                        )
-                if desc_parts:
-                    enriched_text = chunk_text + "\n\n" + "\n".join(desc_parts)
+                        if img.caption:
+                            chunk_image_captions.append(img.caption)
 
             # ── Table-aware enrichment ──
             chunk_table_refs: list[str] = []
+            chunk_table_summaries: list[str] = []
             if page_no > 0 and page_no in page_tables:  # ty:ignore[unsupported-operator]
                 for tbl in page_tables[page_no]:  # ty:ignore[invalid-argument-type]
                     if tbl.table_id not in assigned_tables:
                         chunk_table_refs.append(tbl.table_id)
                         assigned_tables.add(tbl.table_id)
-
-            if chunk_table_refs and tables:
-                tbl_by_id = {t.table_id: t for t in tables}
-                tbl_parts = []
-                for tbl_id in chunk_table_refs:
-                    tbl = tbl_by_id.get(tbl_id)
-                    if tbl and tbl.caption:
-                        tbl_parts.append(
-                            f"[Table on page {tbl.page_no} ({tbl.num_rows}x{tbl.num_cols})]: {tbl.caption}"
-                        )
-                if tbl_parts:
-                    enriched_text = enriched_text + "\n\n" + "\n".join(tbl_parts)
+                        if tbl.caption:
+                            chunk_table_summaries.append(tbl.caption)
 
             chunks.append(
                 EnrichedChunk(
-                    content=sanitize_text(enriched_text),
+                    content=sanitize_text(chunk_text),
                     chunk_index=i,
                     source_file=original_filename,
                     document_id=document_id,
@@ -400,6 +381,8 @@ class DoclingDocumentParser(BaseDocumentParser):
                     heading_path=heading_path,  # ty:ignore[invalid-argument-type]
                     image_refs=chunk_image_refs,
                     table_refs=chunk_table_refs,
+                    image_captions=chunk_image_captions,
+                    table_summaries=chunk_table_summaries,
                     has_table=has_table,
                     has_code=has_code,
                     contextualized=contextualized,
@@ -524,7 +507,7 @@ class DoclingDocumentParser(BaseDocumentParser):
         for idx in pic_to_image_idx:
             if idx >= 0:
                 img = images[idx]
-                url = f"/static/doc-images/kb_{self.workspace_id}/images/{img.image_id}.png"
+                url = f"/api/v1/documents/image/{img.image_id}"
                 pic_url_list.append((img.caption, url))
             else:
                 pic_url_list.append(("", ""))

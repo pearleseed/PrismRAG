@@ -264,15 +264,10 @@ class BaseDocumentParser(ABC):
 
             if chunk.image_refs and images:
                 img_by_id = {im.image_id: im for im in images}
-                desc_parts = []
                 for img_id in chunk.image_refs:
                     img = img_by_id.get(img_id)
                     if img and img.caption:
-                        desc_parts.append(
-                            f"[Image on page {img.page_no}]: {img.caption}"
-                        )
-                if desc_parts:
-                    chunk.content = chunk.content + "\n\n" + "\n".join(desc_parts)
+                        chunk.image_captions.append(img.caption)
 
             # Table refs
             if page_no > 0 and page_no in page_tables:
@@ -283,15 +278,10 @@ class BaseDocumentParser(ABC):
 
             if chunk.table_refs and tables:
                 tbl_by_id = {t.table_id: t for t in tables}
-                tbl_parts = []
                 for tbl_id in chunk.table_refs:
                     tbl = tbl_by_id.get(tbl_id)
                     if tbl and tbl.caption:
-                        tbl_parts.append(
-                            f"[Table on page {tbl.page_no} ({tbl.num_rows}x{tbl.num_cols})]: {tbl.caption}"
-                        )
-                if tbl_parts:
-                    chunk.content = chunk.content + "\n\n" + "\n".join(tbl_parts)
+                        chunk.table_summaries.append(tbl.caption)
 
         if images:
             logger.info(

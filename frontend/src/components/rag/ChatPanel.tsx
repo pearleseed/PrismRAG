@@ -48,6 +48,10 @@ import {
   Hash,
   Layout,
   Ban,
+  MessageSquare,
+  Plus,
+  Edit2,
+  Sidebar as SidebarIcon,
 } from "lucide-react";
 import { PrismLight as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
@@ -95,6 +99,12 @@ SyntaxHighlighter.registerLanguage("markdown", markdown);
 SyntaxHighlighter.registerLanguage("md", markdown);
 import { useUpdateWorkspace } from "@/hooks/useWorkspaces";
 import { useChatHistory, useClearChatHistory } from "@/hooks/useChatHistory";
+import {
+  useConversations,
+  useCreateConversation,
+  useUpdateConversation,
+  useDeleteConversation,
+} from "@/hooks/useConversations";
 import { useRAGChatStream } from "@/hooks/useRAGChatStream";
 import { StreamingMarkdown } from "@/components/rag/MemoizedMarkdown";
 import { ThinkingTimeline } from "@/components/rag/ThinkingTimeline";
@@ -1329,10 +1339,35 @@ export const ChatPanel = memo(function ChatPanel({
   const [enableThinking, setEnableThinking] = useState(false);
   const [thinkingDefaultSynced, setThinkingDefaultSynced] = useState(false);
   const [forceSearch, setForceSearch] = useState(false);
-  const [showScrollButton, setShowScrollButton] = useState(false);
+  const [, setShowScrollButton] = useState(false);
+
+  // Conversation Management State
+  const [selectedConversationId, setSelectedConversationId] = useState<number | null>(() => {
+    const saved = localStorage.getItem(`prismrag-last-conv-${workspaceId}`);
+    return saved ? Number(saved) : null;
+  });
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   // Load chat history from PostgreSQL
-  const { data: historyData, isLoading: historyLoading } = useChatHistory(workspaceId);
+  const { data: historyData, isLoading: historyLoading } = useChatHistory(
+    workspaceId,
+    selectedConversationId,
+  );
+  const { data: conversations, isLoading: conversationsLoading } = useConversations(
+    Number(workspaceId),
+  );
+  const createConvMutation = useCreateConversation(Number(workspaceId));
+  const updateConvMutation = useUpdateConversation(Number(workspaceId));
+  const deleteConvMutation = useDeleteConversation(Number(workspaceId));
+
+  // Auto-select the first conversation if none selected
+  useEffect(() => {
+    if (!selectedConversationId && conversations && conversations.length > 0) {
+      const lastId = conversations[0].id;
+      setSelectedConversationId(lastId);
+      localStorage.setItem(`prismrag-last-conv-${workspaceId}`, String(lastId));
+    }
+  }, [conversations, selectedConversationId, workspaceId]);
   const clearMutation = useClearChatHistory(workspaceId);
   const [showPromptEditor, setShowPromptEditor] = useState(false);
   const [promptDraft, setPromptDraft] = useState("");
@@ -1394,14 +1429,70 @@ export const ChatPanel = memo(function ChatPanel({
     );
   }, [workspace, updateWorkspaceMutation, t]);
 
-  // Check LLM capabilities (thinking support)
   const { data: capabilities } = useQuery<LLMCapabilities>({
     queryKey: ["llm-capabilities"],
     queryFn: () => api.get<LLMCapabilities>("/rag/capabilities"),
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-    retry: 1,
+    staleTime: Infinity,
   });
-  const thinkingSupported = capabilities?.supports_thinking ?? false;
+  const thinkingSupported = capabilities?.supports_thinking || false;
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+
+  const handleRename = useCallback(
+    (id: number) => {
+      if (!editingTitle.trim()) {
+        setEditingId(null);
+        return;
+      }
+      updateConvMutation.mutate(
+        { id, title: editingTitle.trim() },
+        {
+          onSuccess: () => {
+            setEditingId(null);
+            toast.success(t("chat.conversationRenamed"));
+          },
+        },
+      );
+    },
+    [editingTitle, updateConvMutation, t],
+  );
+
+  const handleCreateConversation = useCallback(() => {
+    createConvMutation.mutate(t("chat.newChat"), {
+      onSuccess: (newConv) => {
+        setSelectedConversationId(newConv.id);
+        localStorage.setItem(`prismrag-last-conv-${workspaceId}`, String(newConv.id));
+        toast.success(t("chat.conversationCreated"));
+      },
+    });
+  }, [createConvMutation, t, workspaceId]);
+
+  const handleDeleteConversation = useCallback(
+    (e: React.MouseEvent, id: number) => {
+      e.stopPropagation();
+      if (confirm(t("chat.confirmDeleteConversation"))) {
+        deleteConvMutation.mutate(id, {
+          onSuccess: () => {
+            if (selectedConversationId === id) {
+              setSelectedConversationId(null);
+              localStorage.removeItem(`prismrag-last-conv-${workspaceId}`);
+            }
+            toast.success(t("chat.conversationDeleted"));
+          },
+        });
+      }
+    },
+    [deleteConvMutation, selectedConversationId, t, workspaceId],
+  );
+
+  const handleSelectConversation = useCallback(
+    (id: number) => {
+      setSelectedConversationId(id);
+      localStorage.setItem(`prismrag-last-conv-${workspaceId}`, String(id));
+    },
+    [workspaceId],
+  );
+
 
   // Sync thinking toggle default from server (once per mount)
   useEffect(() => {
@@ -1685,7 +1776,19 @@ export const ChatPanel = memo(function ChatPanel({
         history,
         thinkingSupported && enableThinking,
         forceSearch,
+        selectedConversationId,
       );
+
+      // Auto-title conversation if it's the first message and title is default
+      if (
+        selectedConversationId &&
+        history.length === 0 &&
+        conversations?.find((c) => c.id === selectedConversationId)?.title === t("chat.newChat")
+      ) {
+        // Use first 40 chars of message as title
+        const newTitle = msg.length > 40 ? msg.substring(0, 37) + "..." : msg;
+        updateConvMutation.mutate({ id: selectedConversationId, title: newTitle });
+      }
 
       // Finalize the streaming message (prefer finalMsg.agentSteps — directly from SSE loop,
       // fallback to ref snapshot, then to what was synced into the message during streaming)
@@ -1790,23 +1893,142 @@ export const ChatPanel = memo(function ChatPanel({
     <WsIdCtx.Provider value={workspaceId}>
       <DebugCtx.Provider value={debugMode}>
         <AllSourcesCtx.Provider value={allSources}>
-          <div className="h-full flex flex-col border-r min-h-0">
-            {/* Header */}
-            <div className="shrink-0 flex items-center justify-between px-4 py-2.5 border-b bg-background/80 backdrop-blur-md sticky top-0 z-20">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Bot className="w-4 h-4 text-primary" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-sm font-bold tracking-tight">{t("chat.aiAssistant")}</span>
-                  <div className="flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">
-                      Online
+          <div className="h-full flex bg-background overflow-hidden border-r">
+            {/* Conversations Sidebar */}
+            <AnimatePresence initial={false}>
+              {isSidebarOpen && (
+                <motion.div
+                  initial={{ width: 0, opacity: 0 }}
+                  animate={{ width: 260, opacity: 1 }}
+                  exit={{ width: 0, opacity: 0 }}
+                  transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+                  className="h-full border-r bg-background flex flex-col overflow-hidden shrink-0"
+                >
+                  <div className="p-3 shrink-0 flex flex-col gap-3">
+                    <button
+                      onClick={handleCreateConversation}
+                      disabled={createConvMutation.isPending}
+                      className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/15 transition-all text-sm font-bold group shadow-sm border border-primary/5 active:scale-[0.98]"
+                    >
+                      <Plus className="w-4 h-4 transition-transform group-hover:rotate-90" />
+                      <span>{t("chat.newChat")}</span>
+                      {createConvMutation.isPending && (
+                        <Loader2 className="w-3 h-3 animate-spin ml-auto" />
+                      )}
+                    </button>
+                    <div className="px-1 flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">
+                        {t("chat.conversations")}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+                    {conversationsLoading ? (
+                      <div className="flex items-center justify-center py-10">
+                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground/30" />
+                      </div>
+                    ) : (
+                      <>
+                        {conversations?.map((conv) => (
+                        <div
+                          key={conv.id}
+                          onClick={() => handleSelectConversation(conv.id)}
+                          className={cn(
+                            "group relative flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition-all cursor-pointer border border-transparent",
+                            selectedConversationId === conv.id
+                              ? "bg-primary/8 text-primary font-bold border-primary/10 shadow-sm"
+                              : "text-muted-foreground/80 hover:bg-muted/50 hover:text-foreground",
+                          )}
+                        >
+                          <MessageSquare
+                            className={cn(
+                              "w-4 h-4 shrink-0 transition-transform group-hover:scale-110",
+                              selectedConversationId === conv.id
+                                ? "text-primary"
+                                : "text-muted-foreground/40",
+                            )}
+                          />
+                          {editingId === conv.id ? (
+                            <input
+                              autoFocus
+                              className="flex-1 bg-transparent outline-none border-b border-primary/30 text-xs py-0.5"
+                              value={editingTitle}
+                              onChange={(e) => setEditingTitle(e.target.value)}
+                              onBlur={() => handleRename(conv.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleRename(conv.id);
+                                if (e.key === "Escape") setEditingId(null);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          ) : (
+                            <span className="flex-1 truncate pr-8 text-xs font-medium tracking-tight">
+                              {conv.title}
+                            </span>
+                          )}
+
+                          <div className="absolute right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                            {conv.id !== 0 && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingId(conv.id);
+                                  setEditingTitle(conv.title);
+                                }}
+                                className="p-1.5 rounded-lg hover:bg-primary/10 hover:text-primary transition-all active:scale-90"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            {conv.id !== 0 && (
+                              <button
+                                onClick={(e) => handleDeleteConversation(e, conv.id)}
+                                className="p-1.5 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-all active:scale-90"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Main Chat Area */}
+            <div className="flex-1 flex flex-col relative min-w-0 h-full overflow-hidden">
+              {/* Header */}
+              <div className="shrink-0 flex items-center justify-between px-4 py-2.5 border-b bg-background/80 backdrop-blur-md sticky top-0 z-30">
+                <div className="flex items-center gap-2.5">
+                  <button
+                    onClick={() => setIsSidebarOpen((prev) => !prev)}
+                    className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors mr-1"
+                    title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+                  >
+                    <SidebarIcon className="w-4 h-4" />
+                  </button>
+                  <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Bot className="w-4 h-4 text-primary" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold tracking-tight">
+                      {selectedConversationId
+                        ? conversations?.find((c) => c.id === selectedConversationId)?.title ||
+                          t("chat.aiAssistant")
+                        : t("chat.aiAssistant")}
                     </span>
+                    <div className="flex items-center gap-1">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">
+                        Online
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
               <div className="flex items-center gap-1.5">
                 {/* Thinking toggle — only visible when model supports thinking */}
                 {thinkingSupported && (
@@ -1876,7 +2098,7 @@ export const ChatPanel = memo(function ChatPanel({
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
-                  className="shrink-0 overflow-visible border-b relative z-10"
+                  className="shrink-0 overflow-visible border-b relative z-40"
                 >
                   <div className="px-3 py-2 space-y-2 bg-muted/20">
                     <div className="flex items-center justify-between">
@@ -1915,7 +2137,7 @@ export const ChatPanel = memo(function ChatPanel({
                         </div>
 
                         {/* Tooltip on hover — below icon */}
-                        <div className="absolute left-0 top-full mt-2.5 z-50 w-[380px] rounded-xl border border-blue-500/20 bg-background/95 backdrop-blur-xl shadow-2xl opacity-0 pointer-events-none group-hover/cite:opacity-100 group-hover/cite:pointer-events-auto transition-all duration-300 translate-y-1 group-hover/cite:translate-y-0">
+                        <div className="absolute left-0 top-full mt-2.5 z-100 w-[380px] rounded-xl border border-blue-500/20 bg-background/95 backdrop-blur-xl shadow-2xl opacity-0 pointer-events-none group-hover/cite:opacity-100 group-hover/cite:pointer-events-auto transition-all duration-300 translate-y-1 group-hover/cite:translate-y-0">
                           <div className="p-4 relative overflow-hidden">
                             {/* Background accent */}
 
@@ -2063,22 +2285,6 @@ export const ChatPanel = memo(function ChatPanel({
                 {/* ThinkingTimeline + TypingIndicator now rendered inside MessageBubble */}
                 {/* Bottom spacer = container height, enables user-message scroll-to-top */}
                 <div ref={spacerRef} aria-hidden />
-
-                {/* Scroll to Bottom Button */}
-                <AnimatePresence>
-                  {showScrollButton && (
-                    <motion.button
-                      initial={{ opacity: 0, scale: 0.8, y: 10 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.8, y: 10 }}
-                      onClick={() => scrollToBottom(true)}
-                      className="absolute bottom-4 right-6 w-8 h-8 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90 transition-colors z-30"
-                      title={t("chat.scrollToBottom")}
-                    >
-                      <ChevronDown className="w-5 h-5" />
-                    </motion.button>
-                  )}
-                </AnimatePresence>
               </div>
             )}
 
@@ -2086,7 +2292,7 @@ export const ChatPanel = memo(function ChatPanel({
             <div className="shrink-0 px-4 pb-4 pt-0 border-t bg-background/80 backdrop-blur-md relative group/input flex flex-col">
               {/* Internal Resize Handle */}
               <div
-                className="w-full h-1.5 cursor-ns-resize flex items-center justify-center hover:bg-primary/5 transition-colors group/handle py-2"
+                className="w-full h-1.5 cursor-ns-resize flex items-center justify-center group/handle py-2"
                 onMouseDown={(e) => {
                   const startY = e.clientY;
                   const startHeight = inputRef.current?.offsetHeight || 0;
@@ -2165,6 +2371,7 @@ export const ChatPanel = memo(function ChatPanel({
               <p className="text-[9px] text-muted-foreground/50 mt-1 text-center">
                 {t("chat.inputHint")}
               </p>
+            </div>
             </div>
           </div>
         </AllSourcesCtx.Provider>

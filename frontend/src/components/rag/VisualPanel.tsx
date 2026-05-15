@@ -33,28 +33,28 @@ function TabButton({
       className={cn(
         "group relative flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-200",
         active
-          ? "bg-primary/10 text-primary shadow-sm"
+          ? "text-primary shadow-sm"
           : "text-muted-foreground hover:text-foreground hover:bg-muted/80",
         !showLabel && "px-2 justify-center",
       )}
     >
+      {active && (
+        <motion.div
+          layoutId="activeTab"
+          className="absolute inset-0 border border-primary/20 rounded-md pointer-events-none bg-primary/5"
+          initial={false}
+          transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+        />
+      )}
       <span
         className={cn(
-          "transition-transform duration-200",
+          "relative z-10 transition-transform duration-200",
           active ? "scale-110" : "group-hover:scale-105",
         )}
       >
         {icon}
       </span>
-      {showLabel && <span className="truncate max-w-[120px]">{label}</span>}
-      {active && (
-        <motion.div
-          layoutId="activeTab"
-          className="absolute inset-0 border border-primary/20 rounded-md pointer-events-none"
-          initial={false}
-          transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-        />
-      )}
+      {showLabel && <span className="relative z-10 truncate max-w-[120px]">{label}</span>}
     </button>
   );
 }
@@ -81,11 +81,9 @@ function SubTabButton({
       title={!showLabel ? label : undefined}
       className={cn(
         "relative flex items-center justify-center gap-1.5 flex-1 py-1 text-[11px] font-semibold transition-all duration-200 rounded",
-        active ? "text-primary z-10" : "text-muted-foreground hover:text-foreground",
+        active ? "text-primary" : "text-muted-foreground hover:text-foreground",
       )}
     >
-      <span className={active ? "scale-110" : ""}>{icon}</span>
-      {showLabel && <span className="truncate">{label}</span>}
       {active && (
         <motion.div
           layoutId="activeSubTab"
@@ -94,6 +92,10 @@ function SubTabButton({
           transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
         />
       )}
+      <span className={cn("relative z-10 transition-transform", active && "scale-110")}>
+        {icon}
+      </span>
+      {showLabel && <span className="relative z-10 truncate">{label}</span>}
     </button>
   );
 }

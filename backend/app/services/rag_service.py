@@ -54,6 +54,7 @@ class RAGService:
         workspace_id: int,
         chunk_size: int = 500,
         chunk_overlap: int = 50,
+        index_version: int = 1,
     ):
         """
         Initialize RAG service.
@@ -63,14 +64,16 @@ class RAGService:
             workspace_id: Knowledge base ID for isolation
             chunk_size: Size of text chunks
             chunk_overlap: Overlap between chunks
+            index_version: Version of the vector index
         """
         self.db = db
         self.workspace_id = workspace_id
+        self.index_version = index_version
         self.chunker = DocumentChunker(
             chunk_size=chunk_size, chunk_overlap=chunk_overlap
         )
         self.embedder = get_embedding_service()
-        self.vector_store = get_vector_store(workspace_id)
+        self.vector_store = get_vector_store(workspace_id, index_version=index_version)
 
     async def process_document(self, document_id: int, file_path: str) -> int:
         """
@@ -249,14 +252,26 @@ class RAGService:
         return self.vector_store.count()
 
 
-def get_rag_service(
+async def get_rag_service(
     db: AsyncSession,
     workspace_id: int,
     kg_language: str | None = None,
     kg_entity_types: list[str] | None = None,
+    index_version_override: int | None = None,
 ) -> "RAGService | PrismRAGService":
     """Factory function: routes to PrismRAGService or legacy RAGService based on config."""
     from app.core.config import settings
+    from app.models.knowledge_base import KnowledgeBase
+
+    # Fetch active index version (C-07)
+    if index_version_override is not None:
+        index_version = index_version_override
+    else:
+        result = await db.execute(
+            select(KnowledgeBase).where(KnowledgeBase.id == workspace_id)
+        )
+        kb = result.scalar_one_or_none()
+        index_version = kb.active_index_version if kb else 1
 
     if settings.PRISMRAG_ENABLED:
         from app.services.prism_rag_service import PrismRAGService
@@ -266,6 +281,7 @@ def get_rag_service(
             workspace_id=workspace_id,
             kg_language=kg_language,
             kg_entity_types=kg_entity_types,
+            index_version=index_version,
         )
 
-    return RAGService(db=db, workspace_id=workspace_id)
+    return RAGService(db=db, workspace_id=workspace_id, index_version=index_version)

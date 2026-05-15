@@ -231,7 +231,7 @@ def generate_testset(
                 model="gemini-2.0-flash",
                 contents=prompt,
             )
-            text = resp.text.strip()
+            text = (resp.text or "").strip()
 
             # Clean markdown code fences if present
             if text.startswith("```"):
@@ -398,7 +398,6 @@ def evaluate_with_ragas(
             from ragas.llms import llm_factory
             from ragas.metrics import (
                 Faithfulness,
-                ResponseRelevancy,
                 LLMContextRecall,
                 FactualCorrectness,
             )
@@ -456,11 +455,11 @@ def evaluate_with_ragas(
             ragas_result = ragas_evaluate(
                 dataset=eval_dataset,
                 metrics=metrics,
-                llm=evaluator_llm,
+                llm=evaluator_llm,  # ty:ignore[invalid-argument-type]
             )
 
             # Merge RAGAS scores back into results
-            df = ragas_result.to_pandas()
+            df = ragas_result.to_pandas()  # ty:ignore[unresolved-attribute]
             valid_idx = 0
             for r in results:
                 if r.get("response", "").startswith("ERROR"):
@@ -481,20 +480,23 @@ def evaluate_with_ragas(
                                 r["metrics"][col] = float(val)
                     valid_idx += 1
 
-            print(f"  RAGAS evaluation complete. Aggregate scores:")
+            print("  RAGAS evaluation complete. Aggregate scores:")
             try:
                 # Try dict-like access first
-                scores_dict = (
-                    ragas_result.scores if hasattr(ragas_result, "scores") else {}
-                )
+                scores_dict = {}
+                if hasattr(ragas_result, "scores"):
+                    scores_dict = ragas_result.scores
+                
                 if not scores_dict and hasattr(ragas_result, "to_pandas"):
-                    agg = (
-                        ragas_result.to_pandas().select_dtypes(include="number").mean()
-                    )
-                    scores_dict = agg.to_dict()
-                for metric_name, score in scores_dict.items():
-                    if isinstance(score, (int, float)):
-                        print(f"    {metric_name}: {score:.3f}")
+                    agg_df = ragas_result.to_pandas().select_dtypes(include="number")  # ty:ignore[call-non-callable]
+                    if not agg_df.empty:
+                        agg = agg_df.mean()
+                        scores_dict = agg.to_dict()
+                
+                if isinstance(scores_dict, dict):
+                    for metric_name, score in scores_dict.items():
+                        if isinstance(score, (int, float)):
+                            print(f"    {metric_name}: {score:.3f}")
             except Exception:
                 print("    (aggregate scores unavailable)")
 
@@ -656,7 +658,7 @@ def cmd_generate(args):
         synth_counts[s.get("synthesizer_name", "?")] = (
             synth_counts.get(s.get("synthesizer_name", "?"), 0) + 1
         )
-    print(f"  Distribution:")
+    print("  Distribution:")
     for synth, count in sorted(synth_counts.items()):
         print(f"    {synth}: {count}")
 

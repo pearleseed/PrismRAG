@@ -8,6 +8,7 @@ import { ChatPanel } from "@/components/rag/ChatPanel";
 import { VisualPanel } from "@/components/rag/VisualPanel";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useWorkspace, useUpdateWorkspace } from "@/hooks/useWorkspaces";
+import { useConversations, useCreateConversation } from "@/hooks/useConversations";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Database, MessageSquare, PieChart } from "lucide-react";
@@ -41,6 +42,10 @@ export function WorkspacePage() {
   // -- Workspace data --
   const { data: workspace } = useWorkspace(wsId);
   const updateWorkspace = useUpdateWorkspace();
+
+  // -- Conversations --
+  const { data: conversations } = useConversations(wsId ?? undefined);
+  const createConv = useCreateConversation(wsId ?? undefined);
 
   // -- Store --
   const { selectedDoc, selectDoc, reset: resetStore } = useWorkspaceStore();
@@ -122,6 +127,12 @@ export function WorkspacePage() {
       queryClient.invalidateQueries({ queryKey: ["documents", workspaceId] });
       queryClient.invalidateQueries({ queryKey: ["rag-stats", workspaceId] });
       queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+
+      // Auto-create first conversation if none exist
+      if (!conversations || conversations.length === 0) {
+        createConv.mutate(t("chat.newChat"));
+      }
+
       toast.success(t("workspace.uploadSuccess"));
     },
     onError: () => toast.error(t("workspace.uploadFailed")),

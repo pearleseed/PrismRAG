@@ -4,7 +4,7 @@ set -e
 # Config
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 PORT="${PRISMRAG_BACKEND_PORT:-8080}"
-HOST="${PRISMRAG_BACKEND_HOST:-0.0.0.0}"
+HOST="${PRISMRAG_BACKEND_HOST:-127.0.0.1}"
 VENV="$REPO_ROOT/venv"
 
 # Cleanup: kill processes on port

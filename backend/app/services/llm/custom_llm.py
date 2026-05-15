@@ -16,8 +16,6 @@ import base64
 import json
 import logging
 import ssl
-import time
-import uuid
 from typing import AsyncGenerator, Optional
 from urllib.error import URLError
 from urllib.request import Request, urlopen
@@ -93,7 +91,7 @@ def _create_custom_provider() -> LLMProvider:
             model_name=model_name,
         )
         logger.info(
-            f"Created Custom LLM provider",
+            "Created Custom LLM provider",
             extra={
                 "endpoint": endpoint,
                 "model_name": model_name,
@@ -408,7 +406,7 @@ class CustomLLMProvider(LLMProvider):
         internal_request = self._build_internal_request(final_system, user_input)
 
         logger.debug(
-            f"Custom LLM request",
+            "Custom LLM request",
             extra={"endpoint": self.endpoint},
         )
 
@@ -422,7 +420,7 @@ class CustomLLMProvider(LLMProvider):
             )
 
             logger.debug(
-                f"Custom LLM response",
+                "Custom LLM response",
                 extra={"tokens": token_usage},
             )
 

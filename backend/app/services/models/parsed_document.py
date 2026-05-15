@@ -52,6 +52,12 @@ class EnrichedChunk:
     heading_path: list[str] = field(default_factory=list)
     image_refs: list[str] = field(default_factory=list)  # image_ids nearby
     table_refs: list[str] = field(default_factory=list)  # table_ids nearby
+    image_captions: list[str] = field(
+        default_factory=list
+    )  # [NEW] AI-generated captions
+    table_summaries: list[str] = field(
+        default_factory=list
+    )  # [NEW] AI-generated summaries
     has_table: bool = False
     has_code: bool = False
     contextualized: str = ""  # heading_path joined for context

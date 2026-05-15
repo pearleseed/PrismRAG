@@ -65,6 +65,16 @@ class Settings(BaseSettings):
     CHROMA_HOST: str = Field(default="localhost")
     CHROMA_PORT: int = Field(default=8002)
 
+    # Qdrant
+    VECTOR_DATABASE: str = Field(default="chroma")  # "chroma" | "qdrant"
+    QDRANT_HOST: str = Field(default="localhost")
+    QDRANT_PORT: int = Field(default=6333)
+    QDRANT_GRPC_PORT: int = Field(default=6334)
+    QDRANT_API_KEY: str = Field(default="")
+    QDRANT_USE_HTTPS: bool = Field(default=False)
+    QDRANT_PREFER_GRPC: bool = Field(default=False)
+    PRISMRAG_ENABLE_HYBRID_SEARCH: bool = Field(default=False)
+
     # PrismRAG Pipeline
     PRISMRAG_ENABLED: bool = True
     PRISMRAG_ENABLE_KG: bool = True
@@ -90,7 +100,9 @@ class Settings(BaseSettings):
     PRISMRAG_DEFAULT_QUERY_MODE: str = "hybrid"
     PRISMRAG_DOCLING_IMAGES_SCALE: float = 2.0
     PRISMRAG_MAX_IMAGES_PER_DOC: int = 50
+    PRISMRAG_MAX_PAGES_PER_DOC: int = 200
     PRISMRAG_ENABLE_FORMULA_ENRICHMENT: bool = True
+    PRISMRAG_ENABLE_PROMPT_INJECTION_CHECK: bool = True
 
     # Document Parser provider: "docling" (default) or "marker" (lighter, better math)
     PRISMRAG_DOCUMENT_PARSER: str = "docling"

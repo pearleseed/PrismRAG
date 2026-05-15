@@ -21,7 +21,10 @@ CREATE TABLE public.knowledge_bases (
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     kg_language character varying(50),
-    kg_entity_types json
+    kg_entity_types json,
+    active_index_version integer NOT NULL DEFAULT 1,
+    embedding_model character varying(255),
+    embedding_dimension integer
 );
 
 CREATE TABLE public.chat_messages (
@@ -62,7 +65,24 @@ CREATE TABLE public.documents (
     parser_version character varying(50),
     processing_time_ms integer NOT NULL,
     custom_metadata json,
-    relative_path character varying(500)
+    relative_path character varying(500),
+    index_version integer,
+    embedding_model character varying(255),
+    embedding_dimension integer,
+    document_hash character varying(64)
+);
+
+CREATE TABLE public.ingestion_jobs (
+    id SERIAL PRIMARY KEY,
+    workspace_id integer NOT NULL REFERENCES public.knowledge_bases(id) ON DELETE CASCADE,
+    document_id integer NOT NULL REFERENCES public.documents(id) ON DELETE CASCADE,
+    status character varying(20) NOT NULL,
+    current_step character varying(30) NOT NULL,
+    error_message text,
+    payload_hash character varying(64),
+    retries integer NOT NULL DEFAULT 0,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
 );
 
 CREATE TABLE public.document_images (

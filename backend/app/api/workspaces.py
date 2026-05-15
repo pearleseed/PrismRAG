@@ -4,7 +4,7 @@ Knowledge Base (Workspace) CRUD API endpoints.
 
 import logging
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -65,6 +65,14 @@ async def create_workspace(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new knowledge base."""
+    # Check for duplicate names to prevent race conditions (C-08)
+    existing = await db.execute(select(KnowledgeBase).where(KnowledgeBase.name == body.name))
+    if existing.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Knowledge base with name '{body.name}' already exists.",
+        )
+
     kb = KnowledgeBase(
         name=body.name,
         description=body.description,

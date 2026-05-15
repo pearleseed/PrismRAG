@@ -2,6 +2,7 @@
   "common": {
     "save": "Lưu",
     "cancel": "Hủy",
+    "reset": "Đặt lại",
     "delete": "Xóa",
     "saving": "Đang lưu...",
     "create": "Tạo",
@@ -147,7 +148,14 @@
     "think": "Suy nghĩ",
     "analyzingQuestion": "Đang phân tích câu hỏi của bạn...",
     "searchingDocs": "Đang tìm kiếm tài liệu...",
-    "generatingAnswer": "Đang tạo câu trả lời..."
+    "generatingAnswer": "Đang tạo câu trả lời...",
+    "newChat": "Cuộc trò chuyện mới",
+    "conversations": "Các cuộc trò chuyện",
+    "conversationCreated": "Đã tạo cuộc trò chuyện",
+    "conversationDeleted": "Đã xóa cuộc trò chuyện",
+    "confirmDeleteConversation": "Bạn có chắc chắn muốn xóa cuộc trò chuyện này? Tất cả tin nhắn sẽ bị xóa vĩnh viễn.",
+    "rename": "Đổi tên",
+    "conversationRenamed": "Đã đổi tên cuộc trò chuyện"
   },
   "kb": {
     "knowledgeBases": "Cơ sở kiến thức",

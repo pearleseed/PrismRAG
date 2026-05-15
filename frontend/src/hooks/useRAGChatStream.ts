@@ -40,6 +40,7 @@ export interface RAGStreamResult {
     history: { role: string; content: string }[],
     enableThinking: boolean,
     forceSearch?: boolean,
+    conversationId?: number | null,
   ) => Promise<ChatMessage | null>;
   /** Cancel ongoing stream */
   cancel: () => void;
@@ -207,6 +208,7 @@ export function useRAGChatStream(workspaceId: string): RAGStreamResult {
       history: { role: string; content: string }[],
       enableThinking: boolean,
       forceSearch: boolean = false,
+      conversationId: number | null = null,
     ): Promise<ChatMessage | null> => {
       // Abort any in-flight request before starting a new one
       abortRef.current?.abort();
@@ -260,6 +262,7 @@ export function useRAGChatStream(workspaceId: string): RAGStreamResult {
             history,
             enable_thinking: enableThinking,
             force_search: forceSearch,
+            conversation_id: conversationId,
           }),
           signal: abortRef.current.signal,
         });

@@ -31,6 +31,8 @@ from app.schemas.document import (
     BulkUploadResponse,
 )
 from app.schemas.rag import DocumentImageResponse
+from fastapi.responses import FileResponse
+import filetype
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +53,7 @@ def _inject_images_from_db(
     def _replacer(match):
         try:
             img = next(img_iter)
-            url = f"/static/doc-images/kb_{workspace_id}/images/{img.image_id}.png"
+            url = f"/api/v1/documents/image/{img.image_id}"
             caption = (img.caption or "").replace("[", "").replace("]", "")
             return f"\n![{caption}]({url})\n"
         except StopIteration:
@@ -148,7 +150,7 @@ async def process_document_background(
             kg_language = ws_row.kg_language if ws_row else None
             kg_entity_types = ws_row.kg_entity_types if ws_row else None
 
-            rag_service = get_rag_service(
+            rag_service = await get_rag_service(
                 db,
                 workspace_id,
                 kg_language=kg_language,
@@ -240,23 +242,67 @@ async def upload_documents(
     import aiofiles
 
     for i, file in enumerate(files):
+        # 1. MIME Sniffing & Validation
+        # Read header for signature validation
+        head = await file.read(2048)
+        kind = filetype.guess(head)
+        await file.seek(0)
+
         ext = Path(file.filename or "").suffix.lower()
+
+        # Security: MIME signature check for high-risk formats
+        if kind and ext in [
+            ".pdf",
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".tiff",
+            ".bmp",
+            ".docx",
+            ".pptx",
+            ".xlsx",
+        ]:
+            # Allow minor variations like jpg/jpeg
+            is_valid = (f".{kind.extension}" == ext) or (
+                ext in [".jpg", ".jpeg"] and kind.extension in ["jpg", "jpeg"]
+            )
+            if not is_valid:
+                logger.warning(
+                    f"MIME signature mismatch for {file.filename}: expected {kind.extension}, got {ext}"
+                )
+                continue
+
         if ext not in ALLOWED_EXTENSIONS:
             logger.warning(f"Skipping file {file.filename}: type {ext} not allowed")
             continue
 
-        content = await file.read()
-        if len(content) > MAX_FILE_SIZE:
-            logger.warning(
-                f"Skipping file {file.filename}: too large ({len(content)} bytes)"
-            )
-            continue
-
+        # 2. Streaming Save with Size Limit (S-01)
         filename = f"{uuid.uuid4()}{ext}"
         file_path = UPLOAD_DIR / filename
 
-        async with aiofiles.open(file_path, "wb") as f:
-            await f.write(content)
+        file_size = 0
+        try:
+            async with aiofiles.open(file_path, "wb") as f:
+                while True:
+                    chunk = await file.read(1024 * 1024)  # 1MB buffer
+                    if not chunk:
+                        break
+                    file_size += len(chunk)
+                    if file_size > MAX_FILE_SIZE:
+                        raise HTTPException(
+                            status_code=status.HTTP_413_PAYLOAD_TOO_LARGE,
+                            detail=f"File {file.filename} exceeds {MAX_FILE_SIZE} bytes",
+                        )
+                    await f.write(chunk)
+        except HTTPException:
+            if file_path.exists():
+                os.remove(file_path)
+            raise
+        except Exception as e:
+            if file_path.exists():
+                os.remove(file_path)
+            logger.error(f"Failed to stream write {file.filename}: {e}")
+            continue
 
         rel_path = paths_list[i] if paths_list and i < len(paths_list) else None
         if rel_path == "":
@@ -267,7 +313,7 @@ async def upload_documents(
             filename=filename,
             original_filename=file.filename,
             file_type=ext[1:],
-            file_size=len(content),
+            file_size=file_size,
             status=DocumentStatus.PENDING,
             custom_metadata=parsed_metadata,
             relative_path=rel_path,
@@ -379,7 +425,7 @@ async def get_document_images(
             caption=img.caption or "",
             width=img.width,
             height=img.height,
-            url=f"/static/doc-images/kb_{document.workspace_id}/images/{img.image_id}.png",
+            url=f"/api/v1/documents/image/{img.image_id}",
         )
         for img in images
     ]
@@ -401,7 +447,7 @@ async def delete_document(
         try:
             from app.services.rag_service import get_rag_service
 
-            rag_service = get_rag_service(db, document.workspace_id)
+            rag_service = await get_rag_service(db, document.workspace_id)
             await rag_service.delete_document(document_id)
         except Exception as e:
             logger.warning(f"Failed to delete chunks from vector store: {e}")
@@ -415,3 +461,24 @@ async def delete_document(
 
     await db.delete(document)
     await db.commit()
+
+
+@router.get("/image/{image_id}")
+async def serve_image(
+    image_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Securely serve an extracted image if it exists in the DB."""
+    result = await db.execute(
+        select(DocumentImage).where(DocumentImage.image_id == image_id)
+    )
+    img = result.scalar_one_or_none()
+    if not img:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    path = Path(img.file_path)
+    if not path.exists():
+        logger.warning(f"Image file missing on disk: {path}")
+        raise HTTPException(status_code=404, detail="Image file missing")
+
+    return FileResponse(path, media_type=img.mime_type)

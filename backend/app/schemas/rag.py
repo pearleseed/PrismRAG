@@ -204,7 +204,12 @@ class ChatRequest(BaseModel):
 
     message: str = Field(..., min_length=1, max_length=5000)
     history: list[ChatMessageSchema] = []
-    document_ids: list[int] | None = None
+    conversation_id: int | None = Field(
+        default=None, description="Persist message to this conversation"
+    )
+    document_ids: list[int] | None = Field(
+        default=None, description="Filter search to specific document IDs"
+    )
     enable_thinking: bool = False
     force_search: bool = (
         False  # Pre-search before LLM call; injects sources as context directly
@@ -275,6 +280,7 @@ class ChatHistoryResponse(BaseModel):
     """Response for GET chat history."""
 
     workspace_id: int
+    conversation_id: int | None = None
     messages: list[PersistedChatMessage]
     total: int
 

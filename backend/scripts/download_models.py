@@ -9,7 +9,6 @@ Environment variables (optional):
 """
 
 import os
-import sys
 
 
 def download_models():
@@ -22,11 +21,11 @@ def download_models():
 
     print(f"[1/2] Downloading embedding model: {embedding_model}")
     SentenceTransformer(embedding_model)
-    print(f"      Done.")
+    print("      Done.")
 
     print(f"[2/2] Downloading reranker model: {reranker_model}")
     CrossEncoder(reranker_model)
-    print(f"      Done.")
+    print("      Done.")
 
     print("\nAll models downloaded successfully.")
 

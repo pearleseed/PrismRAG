@@ -2,6 +2,7 @@
   "common": {
     "save": "Save",
     "cancel": "Cancel",
+    "reset": "Reset",
     "delete": "Delete",
     "saving": "Saving...",
     "create": "Create",
@@ -147,7 +148,14 @@
     "think": "Think",
     "analyzingQuestion": "Analyzing your question...",
     "searchingDocs": "Searching documents...",
-    "generatingAnswer": "Generating answer..."
+    "generatingAnswer": "Generating answer...",
+    "newChat": "New Chat",
+    "conversations": "Conversations",
+    "conversationCreated": "Conversation created",
+    "conversationDeleted": "Conversation deleted",
+    "confirmDeleteConversation": "Are you sure you want to delete this conversation? All messages will be permanently removed.",
+    "rename": "Rename",
+    "conversationRenamed": "Conversation renamed"
   },
   "kb": {
     "knowledgeBases": "Knowledge Bases",
